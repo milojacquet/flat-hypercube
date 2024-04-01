@@ -184,7 +184,7 @@ impl Layout {
                 grid.push(row);
             }
 
-            Self::concat_grid(grid, GAPS[d as usize - 1], GAPS[d as usize])
+            Self::concat_grid(grid, GAPS[d as usize - 1], GAPS[d as usize]).move_right(1)
         }
     }
 }

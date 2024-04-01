@@ -39,6 +39,10 @@ const NEG_COLORS: &'static [Color] = &[
 ];
 const PIECE_COLOR: Color = hex(0x808080);
 
+struct AppState {
+    puzzle: Puzzle,
+}
+
 fn main() -> io::Result<()> {
     let args: Vec<String> = env::args().collect();
     let n = args[1].parse().expect("must be integer");
@@ -46,8 +50,13 @@ fn main() -> io::Result<()> {
     if n > 6 {
         panic!("dimension should be less than or equal to 6")
     }
-    let puzzle = Puzzle::make_solved(n, d);
+    let mut state = AppState {
+        puzzle: Puzzle::make_solved(n, d),
+    };
     let layout = Layout::make_layout(n, d);
+
+    // puzzle.turn(0, 2, 2, 1); // R
+    // puzzle.turn(1, 2, 0, 2); // U
 
     /*println!("{:?}", puzzle);
     println!("{:?}", layout);
@@ -61,7 +70,7 @@ fn main() -> io::Result<()> {
         let ch;
         let color;
         if pos.iter().any(|x| x.abs() == n) {
-            let side = puzzle.stickers[&pos];
+            let side = state.puzzle.stickers[&pos];
             if side >= 0 {
                 ch = POS_NAMES[side as usize];
                 color = POS_COLORS[side as usize];
