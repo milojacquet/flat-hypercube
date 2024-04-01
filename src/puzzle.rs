@@ -93,4 +93,20 @@ impl Puzzle {
         self.stickers.extend(new_stickers);
         Some(())
     }
+
+    pub fn puzzle_rotate(&mut self, from: i16, to: i16) -> Option<()> {
+        if from == to || from == !to {
+            return None;
+        }
+
+        let mut new_stickers = HashMap::new();
+        for (pos, _color) in &self.stickers {
+            let mut from_pos = pos.clone();
+            from_pos[from as usize] = pos[to as usize];
+            from_pos[to as usize] = -pos[from as usize];
+            new_stickers.insert(pos.clone(), self.stickers[&from_pos]);
+        }
+        self.stickers = new_stickers;
+        Some(())
+    }
 }

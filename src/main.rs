@@ -7,6 +7,7 @@ use crossterm::{
 };
 use layout::Layout;
 use puzzle::Puzzle;
+use rand::prelude::*;
 use std::env;
 use std::io::{self, Write};
 use std::thread::sleep;
@@ -30,6 +31,10 @@ const NEG_KEYS: &'static [char] = &['w', 'c', 'r', 'd', 'g', 'h'];
 const AXIS_KEYS: &'static [char] = &['k', 'j', 'l', 'i', 'u', 'o'];
 const LAYER_KEYS: &'static [char] = &['1', '2', '3', '4', '5', '6', '7', '8'];
 const ROT_KEY: char = 'x';
+const SCRAMBLE_KEY: char = '=';
+const RESET_KEY: char = '-';
+const DAMAGE_REPEAT: u8 = 5;
+
 const POS_COLORS: &'static [Color] = &[
     hex(0xff0000),
     hex(0xffffff),
@@ -51,15 +56,16 @@ const ALERT_COLOR: Color = hex(0xd86c6c);
 const FRAME_LENGTH: Duration = Duration::from_millis(1000 / 30);
 const ALERT_FRAMES: u8 = 4;
 
-enum TurnLayer {
-    Layer(i16),
+#[derive(PartialEq, PartialOrd, Eq, Copy, Clone)]
+enum TurnSide {
+    Side(i16),
     WholePuzzle,
 }
 
 #[derive(Default)]
 struct TurnBuild {
-    layer: Option<TurnLayer>,
-    side: Option<i16>,
+    layer: Option<i16>,
+    side: Option<TurnSide>,
     from: Option<i16>, // no need to remember to because that immediately triggers the move
 }
 
@@ -68,6 +74,8 @@ struct AppState {
     current_keys: String,
     current_turn: TurnBuild,
     alert: u8,
+    damage_counter: Option<(char, u8)>,
+    rng: ThreadRng,
 }
 
 impl AppState {
@@ -77,29 +85,57 @@ impl AppState {
     }
 
     fn process_key(&mut self, c: char) {
+        if c == SCRAMBLE_KEY || c == RESET_KEY {
+            match self.damage_counter {
+                None => self.damage_counter = Some((c, 1)),
+                Some((ch, i)) if ch == c => {
+                    self.damage_counter = Some((c, i + 1));
+                }
+                _ => (),
+            }
+        } else {
+            self.damage_counter = None;
+        }
+
+        if let Some((ch, 5)) = self.damage_counter {
+            self.flush_turn();
+            if ch == SCRAMBLE_KEY && self.puzzle.d >= 3 {
+                for _ in 0..5000 {
+                    let mut axes: Vec<i16> = (0..self.puzzle.n).collect();
+                    axes.shuffle(&mut self.rng);
+                    let layer = self.puzzle.n - 1 - 2 * self.rng.gen_range(0..self.puzzle.n);
+                    self.puzzle.turn(axes[0], layer, layer, axes[1], axes[2]);
+                }
+            } else if ch == RESET_KEY {
+                self.puzzle = Puzzle::make_solved(self.puzzle.n, self.puzzle.d);
+            }
+            self.damage_counter = None;
+        }
+
         if let Some(s) = LAYER_KEYS.iter().position(|ch| ch == &c) {
-            if s as i16 >= self.puzzle.n {
+            if s as i16 >= self.puzzle.n || self.current_turn.side == Some(TurnSide::WholePuzzle) {
                 return;
             }
             self.current_keys.push(c);
-            self.current_turn.layer = Some(TurnLayer::Layer(s as i16));
-        } else if c == ROT_KEY {
-            self.current_keys.push(c);
-            self.current_turn.layer = Some(TurnLayer::WholePuzzle);
+            self.current_turn.layer = Some(s as i16);
         } else if let Some(s) = POS_KEYS.iter().position(|ch| ch == &c) {
             if s as u16 >= self.puzzle.d {
                 return;
             }
             self.flush_turn();
             self.current_keys.push(c);
-            self.current_turn.side = Some(s as i16);
+            self.current_turn.side = Some(TurnSide::Side(s as i16));
         } else if let Some(s) = NEG_KEYS.iter().position(|ch| ch == &c) {
             if s as u16 >= self.puzzle.d {
                 return;
             }
             self.flush_turn();
             self.current_keys.push(c);
-            self.current_turn.side = Some(!(s as i16));
+            self.current_turn.side = Some(TurnSide::Side(!(s as i16)));
+        } else if c == ROT_KEY {
+            self.flush_turn();
+            self.current_keys.push(c);
+            self.current_turn.side = Some(TurnSide::WholePuzzle);
         } else if let (Some(side), Some(s)) = (
             self.current_turn.side,
             AXIS_KEYS.iter().position(|ch| ch == &c),
@@ -109,28 +145,34 @@ impl AppState {
             }
             self.current_keys.push(c);
             if let Some(from) = self.current_turn.from {
-                let mut layer_min;
-                let mut layer_max;
-                match self.current_turn.layer {
-                    None => {
-                        layer_min = self.puzzle.n - 1;
-                        layer_max = self.puzzle.n - 1;
+                let turn_out;
+                match side {
+                    TurnSide::Side(side) => {
+                        let mut layer_min;
+                        let mut layer_max;
+                        match self.current_turn.layer {
+                            None => {
+                                layer_min = self.puzzle.n - 1;
+                                layer_max = self.puzzle.n - 1;
+                            }
+                            Some(l) => {
+                                layer_min = self.puzzle.n - 1 - 2 * l;
+                                layer_max = self.puzzle.n - 1 - 2 * l;
+                            }
+                        }
+                        if side < 0 {
+                            layer_min *= -1;
+                            layer_max *= -1;
+                            std::mem::swap(&mut layer_min, &mut layer_max)
+                        };
+                        turn_out = self.puzzle.turn(side, layer_min, layer_max, from, s as i16);
                     }
-                    Some(TurnLayer::Layer(l)) => {
-                        layer_min = self.puzzle.n - 1 - 2 * l;
-                        layer_max = self.puzzle.n - 1 - 2 * l;
-                    }
-                    Some(TurnLayer::WholePuzzle) => {
-                        layer_min = -self.puzzle.n + 1;
-                        layer_max = self.puzzle.n - 1;
+                    TurnSide::WholePuzzle => {
+                        turn_out = self.puzzle.puzzle_rotate(from, s as i16);
                     }
                 }
-                if side < 0 {
-                    layer_min *= -1;
-                    layer_max *= -1;
-                    std::mem::swap(&mut layer_min, &mut layer_max)
-                };
-                match self.puzzle.turn(side, layer_min, layer_max, from, s as i16) {
+
+                match turn_out {
                     None => {
                         self.alert = ALERT_FRAMES * 4 - 1;
                         self.current_keys =
@@ -157,7 +199,9 @@ fn main() -> io::Result<()> {
         puzzle: Puzzle::make_solved(n, d),
         current_keys: "".to_string(),
         current_turn: Default::default(),
-        alert: 0,
+        alert: Default::default(),
+        damage_counter: Default::default(),
+        rng: rand::thread_rng(),
     };
     let layout = Layout::make_layout(n, d);
 
