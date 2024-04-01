@@ -54,27 +54,36 @@ impl Puzzle {
         true
     }
 
-    pub fn turn(&mut self, side: i16, layer: i16, mut from: i16, mut to: i16) -> Option<()> {
+    pub fn turn(
+        &mut self,
+        side: i16,
+        layer_min: i16,
+        layer_max: i16,
+        mut from: i16,
+        mut to: i16,
+    ) -> Option<()> {
         if side == from || side == !from || side == to || side == !to || from == to || from == !to {
             return None;
         }
 
+        let layer_range = layer_min - 1..=layer_max + 1;
+
+        let to_swap = (from < 0) != (to < 0);
+        if from < 0 {
+            from = !from
+        }
+        if to < 0 {
+            to = !to
+        }
+        if to_swap {
+            std::mem::swap(&mut from, &mut to)
+        }
+
         let mut new_stickers = HashMap::new();
         for (pos, _color) in &self.stickers {
-            if (side >= 0 && (layer - 1..layer + 2).contains(&pos[side as usize]))
-                || (side < 0 && (layer - 1..layer + 2).contains(&pos[(!side) as usize]))
+            if (side >= 0 && layer_range.contains(&pos[side as usize]))
+                || (side < 0 && layer_range.contains(&pos[(!side) as usize]))
             {
-                let to_swap = (from < 0) != (to < 0);
-                if from < 0 {
-                    from = !from
-                }
-                if to < 0 {
-                    to = !to
-                }
-                if to_swap {
-                    std::mem::swap(&mut from, &mut to)
-                }
-
                 let mut from_pos = pos.clone();
                 from_pos[from as usize] = pos[to as usize];
                 from_pos[to as usize] = -pos[from as usize];
