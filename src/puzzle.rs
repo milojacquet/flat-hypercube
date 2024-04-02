@@ -10,7 +10,7 @@ pub struct Puzzle {
     pub stickers: HashMap<Vec<i16>, i16>,
 }
 
-fn ax(s: i16) -> i16 {
+pub fn ax(s: i16) -> i16 {
     s.max(!s)
 }
 
