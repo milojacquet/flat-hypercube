@@ -1,6 +1,7 @@
 use itertools::Itertools;
 use std::collections::HashMap;
 
+#[derive(Clone)]
 pub struct SideTurn {
     pub side: i16,
     pub layer_min: i16,
@@ -21,6 +22,7 @@ impl SideTurn {
     }
 }
 
+#[derive(Clone)]
 pub struct PuzzleTurn {
     pub from: i16,
     pub to: i16,
@@ -35,6 +37,7 @@ impl PuzzleTurn {
     }
 }
 
+#[derive(Clone)]
 pub enum Turn {
     Side(SideTurn),
     Puzzle(PuzzleTurn),
@@ -90,13 +93,18 @@ impl Puzzle {
         Puzzle { n, d, stickers }
     }
 
-    #[allow(dead_code)]
     pub fn is_solved(&self) -> bool {
+        let mut side_colors = HashMap::new();
         for (pos, &color) in &self.stickers {
-            if color >= 0 && pos[color as usize] != self.n {
-                return false;
-            } else if color < 0 && pos[!color as usize] != -self.n {
-                return false;
+            let side = pos
+                .iter()
+                .position(|x| x.abs() == self.n)
+                .expect("should be on a face");
+            let side = if pos[side] < 0 { !side } else { side };
+            let old_color = side_colors.insert(side, color);
+            match old_color {
+                Some(c) if c != color => return false,
+                _ => (),
             }
         }
         true

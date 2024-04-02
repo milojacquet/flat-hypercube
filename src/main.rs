@@ -37,6 +37,8 @@ const RESET_KEY: char = '-';
 const DAMAGE_REPEAT: u8 = 5;
 const KEYBIND_KEY: char = '\\';
 const KEYBIND_AXIAL_KEY: char = '|';
+const UNDO_KEY: char = 'z';
+const REDO_KEY: char = 'Z';
 
 const POS_COLORS: &'static [Color] = &[
     hex(0xff0000),
@@ -143,6 +145,8 @@ struct AppState {
     keybind_set: KeybindSet,
     keybind_axial: KeybindAxial,
     message: Option<String>,
+    undo_history: Vec<Turn>,
+    redo_history: Vec<Turn>,
 }
 
 impl AppState {
@@ -151,7 +155,7 @@ impl AppState {
         self.current_turn = Default::default();
     }
 
-    fn process_key(&mut self, c: char, mods: KeyModifiers) {
+    fn process_key(&mut self, c: char, _mods: KeyModifiers) {
         self.message = None;
         if c == SCRAMBLE_KEY || c == RESET_KEY {
             match self.damage_counter {
@@ -168,6 +172,7 @@ impl AppState {
         if let Some((ch, DAMAGE_REPEAT)) = self.damage_counter {
             self.flush_turn();
             if ch == SCRAMBLE_KEY && self.puzzle.d >= 3 {
+                self.puzzle = Puzzle::make_solved(self.puzzle.n, self.puzzle.d);
                 for _ in 0..5000 {
                     let mut axes: Vec<i16> = (0..self.puzzle.d as i16).collect();
                     axes.shuffle(&mut self.rng);
@@ -179,11 +184,15 @@ impl AppState {
                         from: axes[1],
                         to: axes[2],
                     }));
-                    self.message = Some("scrambled with 5000 turns".to_string())
+                    self.message = Some("scrambled with 5000 turns".to_string());
                 }
+                self.undo_history = vec![];
+                self.redo_history = vec![];
             } else if ch == RESET_KEY {
                 self.puzzle = Puzzle::make_solved(self.puzzle.n, self.puzzle.d);
-                self.message = Some("puzzle reset".to_string())
+                self.message = Some("puzzle reset".to_string());
+                self.undo_history = vec![];
+                self.redo_history = vec![];
             }
             self.damage_counter = None;
         }
@@ -198,6 +207,30 @@ impl AppState {
             self.flush_turn();
             self.keybind_axial = self.keybind_axial.next();
             self.message = Some(format!("set axis mode to {}", self.keybind_axial.name()))
+        } else if c == UNDO_KEY {
+            self.flush_turn();
+            let undid = self.undo_history.pop();
+            match undid {
+                None => {
+                    self.message = Some("nothing to undo".to_string());
+                }
+                Some(undid) => {
+                    self.puzzle.turn(undid.inverse());
+                    self.redo_history.push(undid)
+                }
+            }
+        } else if c == REDO_KEY {
+            self.flush_turn();
+            let redid = self.redo_history.pop();
+            match redid {
+                None => {
+                    self.message = Some("nothing to redo".to_string());
+                }
+                Some(redid) => {
+                    self.puzzle.turn(redid.clone());
+                    self.undo_history.push(redid)
+                }
+            }
         } else if let Some(s) = LAYER_KEYS.iter().position(|ch| ch == &c) {
             if s as i16 >= self.puzzle.n {
                 return;
@@ -400,8 +433,8 @@ impl AppState {
     }
 
     fn perform_turn(&mut self, side: i16, from: i16, to: i16) -> Option<()> {
-        match self.current_turn.layer {
-            Some(TurnLayer::WholePuzzle) => self.puzzle.turn(Turn::Puzzle(PuzzleTurn { from, to })),
+        let turn = match self.current_turn.layer {
+            Some(TurnLayer::WholePuzzle) => Turn::Puzzle(PuzzleTurn { from, to }),
             _ => {
                 let mut layer_min;
                 let mut layer_max;
@@ -421,15 +454,24 @@ impl AppState {
                     layer_max *= -1;
                     std::mem::swap(&mut layer_min, &mut layer_max)
                 };
-                self.puzzle.turn(Turn::Side(SideTurn {
+                Turn::Side(SideTurn {
                     side,
                     layer_min,
                     layer_max,
                     from,
                     to,
-                }))
+                })
             }
+        };
+
+        self.undo_history.push(turn.clone());
+        let turn_out = self.puzzle.turn(turn);
+
+        if self.puzzle.is_solved() {
+            self.message = Some("solved!".to_string());
         }
+
+        turn_out
     }
 
     fn get_message(&self) -> String {
@@ -454,6 +496,8 @@ fn main() -> io::Result<()> {
         keybind_set: KeybindSet::ThreeKey,
         keybind_axial: KeybindAxial::Axial,
         message: Default::default(),
+        undo_history: Default::default(),
+        redo_history: Default::default(),
     };
     let layout = Layout::make_layout(n, d);
 
