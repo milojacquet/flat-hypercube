@@ -25,11 +25,11 @@ const fn hex(hex: u32) -> Color {
 
 const POS_NAMES: &'static [&'static str] = &["R", "U", "F", "O", "A", "Γ", "Θ", "Ξ"];
 const NEG_NAMES: &'static [&'static str] = &["L", "D", "B", "I", "P", "Δ", "Λ", "Π"];
-const POS_KEYS: &'static [char] = &['f', 'e', 's', 'v', 't', 'y'];
-const NEG_KEYS: &'static [char] = &['w', 'c', 'r', 'd', 'g', 'h'];
+const POS_KEYS: &'static [char] = &['f', 'e', 's', 'v', 't', 'y', 'n', 'q'];
+const NEG_KEYS: &'static [char] = &['w', 'c', 'r', 'd', 'g', 'h', 'b', 'a'];
 const POS_KEYS_RIGHT: &'static [char] = &['l', 'i', 'j', '.', 'p', '['];
 const NEG_KEYS_RIGHT: &'static [char] = &['u', ',', 'o', 'k', 'l', ';'];
-const AXIS_KEYS: &'static [char] = &['k', 'j', 'l', 'i', 'u', 'o'];
+const AXIS_KEYS: &'static [char] = &['k', 'j', 'l', 'i', 'u', 'o', 'p', ';'];
 const LAYER_KEYS: &'static [char] = &['1', '2', '3', '4', '5', '6', '7', '8'];
 const ROT_KEY: char = 'x';
 const SCRAMBLE_KEY: char = '=';
@@ -47,6 +47,8 @@ const POS_COLORS: &'static [Color] = &[
     hex(0xff00ff),
     hex(0x0aaa85),
     hex(0x774811),
+    hex(0xf49fef),
+    hex(0xb29867),
 ];
 const NEG_COLORS: &'static [Color] = &[
     hex(0xff8000),
@@ -55,6 +57,8 @@ const NEG_COLORS: &'static [Color] = &[
     hex(0x8f10ea),
     hex(0x7daa0a),
     hex(0x6d4564),
+    hex(0xb29867),
+    hex(0xb27967),
 ];
 const PIECE_COLOR: Color = hex(0x808080);
 const ALERT_COLOR: Color = hex(0xd86c6c);
@@ -204,9 +208,13 @@ impl AppState {
             self.keybind_set = self.keybind_set.next(self.puzzle.n);
             self.message = Some(format!("set keybinds to {}", self.keybind_set.name()))
         } else if c == KEYBIND_AXIAL_KEY {
-            self.flush_turn();
-            self.keybind_axial = self.keybind_axial.next();
-            self.message = Some(format!("set axis mode to {}", self.keybind_axial.name()))
+            if self.puzzle.d > 6 {
+                self.message = Some("not enough room for side keybinds".to_string());
+            } else {
+                self.flush_turn();
+                self.keybind_axial = self.keybind_axial.next();
+                self.message = Some(format!("set axis mode to {}", self.keybind_axial.name()))
+            }
         } else if c == UNDO_KEY {
             self.flush_turn();
             let undid = self.undo_history.pop();
@@ -483,8 +491,9 @@ fn main() -> io::Result<()> {
     let args: Vec<String> = env::args().collect();
     let n = args[1].parse().expect("must be integer");
     let d = args[2].parse().expect("must be integer");
-    if n > 6 {
-        panic!("dimension should be less than or equal to 6")
+    let compact = args[3..].contains(&"--compact".to_string());
+    if d > 8 {
+        panic!("dimension should be less than or equal to 8")
     }
     let mut state = AppState {
         puzzle: Puzzle::make_solved(n, d),
@@ -499,7 +508,7 @@ fn main() -> io::Result<()> {
         undo_history: Default::default(),
         redo_history: Default::default(),
     };
-    let layout = Layout::make_layout(n, d);
+    let layout = Layout::make_layout(n, d, compact).move_right(1);
 
     let mut stdout = io::stdout();
     terminal::enable_raw_mode()?;

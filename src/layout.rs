@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::iter::once;
 
-const GAPS: &'static [i16] = &[0, 1, 0, 2, 1, 10, 4];
+const GAPS: &'static [i16] = &[0, 1, 0, 2, 1, 10, 4, 40, 18];
+const GAPS_COMPACT: &'static [i16] = &[0, 1, 0, 1, 0, 1, 0, 1, 0];
 
 #[derive(Debug, Clone)]
 pub struct Layout {
@@ -29,7 +30,7 @@ impl Layout {
         self
     }
 
-    fn move_right(self, shift: i16) -> Self {
+    pub fn move_right(self, shift: i16) -> Self {
         let mut out = Self::new();
         for ((x, y), val) in &self.points {
             out.points.insert((x + shift, *y), val.to_vec());
@@ -145,7 +146,9 @@ impl Layout {
         lower
     }
 
-    pub fn make_layout(n: i16, d: u16) -> Layout {
+    pub fn make_layout(n: i16, d: u16, compact: bool) -> Layout {
+        let gaps = if compact { GAPS_COMPACT } else { GAPS };
+
         if d == 0 {
             Layout {
                 width: 1,
@@ -153,7 +156,7 @@ impl Layout {
                 points: HashMap::from([((0, 0), vec![])]),
             }
         } else if d % 2 == 1 {
-            let lower = Self::make_layout(n, ((d as i16) - 1) as u16);
+            let lower = Self::make_layout(n, ((d as i16) - 1) as u16, compact);
             let mut row = vec![];
 
             for i in once(-n).chain((-n + 1..n).step_by(2)).chain(once(n)) {
@@ -163,9 +166,9 @@ impl Layout {
                 }
                 row.push(lower);
             }
-            Self::concat_horiz(row, GAPS[d as usize])
+            Self::concat_horiz(row, gaps[d as usize])
         } else {
-            let lower = Self::make_layout(n, ((d as i16) - 2) as u16);
+            let lower = Self::make_layout(n, ((d as i16) - 2) as u16, compact);
             let mut grid = vec![];
 
             for i in once(-n).chain((-n + 1..n).step_by(2)).chain(once(n)) {
@@ -184,7 +187,7 @@ impl Layout {
                 grid.push(row);
             }
 
-            Self::concat_grid(grid, GAPS[d as usize - 1], GAPS[d as usize]).move_right(1)
+            Self::concat_grid(grid, gaps[d as usize - 1], gaps[d as usize])
         }
     }
 }
