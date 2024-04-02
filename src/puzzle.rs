@@ -1,6 +1,54 @@
 use itertools::Itertools;
 use std::collections::HashMap;
 
+pub struct SideTurn {
+    pub side: i16,
+    pub layer_min: i16,
+    pub layer_max: i16,
+    pub from: i16,
+    pub to: i16,
+}
+
+impl SideTurn {
+    pub fn inverse(&self) -> Self {
+        SideTurn {
+            from: self.to,
+            to: self.from,
+            side: self.side,
+            layer_min: self.layer_min,
+            layer_max: self.layer_max,
+        }
+    }
+}
+
+pub struct PuzzleTurn {
+    pub from: i16,
+    pub to: i16,
+}
+
+impl PuzzleTurn {
+    pub fn inverse(&self) -> Self {
+        PuzzleTurn {
+            from: self.to,
+            to: self.from,
+        }
+    }
+}
+
+pub enum Turn {
+    Side(SideTurn),
+    Puzzle(PuzzleTurn),
+}
+
+impl Turn {
+    pub fn inverse(&self) -> Self {
+        match self {
+            Self::Side(t) => Self::Side(t.inverse()),
+            Self::Puzzle(t) => Self::Puzzle(t.inverse()),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Puzzle {
     pub n: i16,
@@ -54,14 +102,14 @@ impl Puzzle {
         true
     }
 
-    pub fn turn(
-        &mut self,
-        side: i16,
-        layer_min: i16,
-        layer_max: i16,
-        mut from: i16,
-        mut to: i16,
-    ) -> Option<()> {
+    fn side_turn(&mut self, turn: SideTurn) -> Option<()> {
+        let SideTurn {
+            side,
+            layer_min,
+            layer_max,
+            mut from,
+            mut to,
+        } = turn;
         if side == from || side == !from || side == to || side == !to || from == to || from == !to {
             return None;
         }
@@ -94,7 +142,8 @@ impl Puzzle {
         Some(())
     }
 
-    pub fn puzzle_rotate(&mut self, from: i16, to: i16) -> Option<()> {
+    fn puzzle_rotate(&mut self, turn: PuzzleTurn) -> Option<()> {
+        let PuzzleTurn { from, to } = turn;
         if from == to || from == !to {
             return None;
         }
@@ -108,5 +157,12 @@ impl Puzzle {
         }
         self.stickers = new_stickers;
         Some(())
+    }
+
+    pub fn turn(&mut self, turn: Turn) -> Option<()> {
+        match turn {
+            Turn::Side(t) => self.side_turn(t),
+            Turn::Puzzle(t) => self.puzzle_rotate(t),
+        }
     }
 }

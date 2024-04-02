@@ -1,12 +1,11 @@
 use crossterm::{
     cursor,
     event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
-    queue,
     style::{self, Color, Stylize},
     terminal, ExecutableCommand, QueueableCommand,
 };
 use layout::Layout;
-use puzzle::{ax, Puzzle};
+use puzzle::{ax, Puzzle, PuzzleTurn, SideTurn, Turn};
 use rand::prelude::*;
 use std::env;
 use std::io::{self, Write};
@@ -173,7 +172,13 @@ impl AppState {
                     let mut axes: Vec<i16> = (0..self.puzzle.d as i16).collect();
                     axes.shuffle(&mut self.rng);
                     let layer = self.puzzle.n - 1 - 2 * self.rng.gen_range(0..self.puzzle.n);
-                    self.puzzle.turn(axes[0], layer, layer, axes[1], axes[2]);
+                    self.puzzle.turn(Turn::Side(SideTurn {
+                        side: axes[0],
+                        layer_min: layer,
+                        layer_max: layer,
+                        from: axes[1],
+                        to: axes[2],
+                    }));
                     self.message = Some("scrambled with 5000 turns".to_string())
                 }
             } else if ch == RESET_KEY {
@@ -338,7 +343,6 @@ impl AppState {
 
                             for axis in 0..self.puzzle.d as i16 {
                                 if !axes.contains(&axis) {
-                                    // there was a duplicate in axes
                                     axes.push(axis);
                                 }
                             }
@@ -346,6 +350,7 @@ impl AppState {
                             let mut turn_out = Some(()); // i wish we had try blocks
 
                             if axes.len() > self.puzzle.d as usize {
+                                // there was a duplicate in axes
                                 turn_out = None;
                             }
 
@@ -396,7 +401,7 @@ impl AppState {
 
     fn perform_turn(&mut self, side: i16, from: i16, to: i16) -> Option<()> {
         match self.current_turn.layer {
-            Some(TurnLayer::WholePuzzle) => self.puzzle.puzzle_rotate(from, to),
+            Some(TurnLayer::WholePuzzle) => self.puzzle.turn(Turn::Puzzle(PuzzleTurn { from, to })),
             _ => {
                 let mut layer_min;
                 let mut layer_max;
@@ -416,7 +421,13 @@ impl AppState {
                     layer_max *= -1;
                     std::mem::swap(&mut layer_min, &mut layer_max)
                 };
-                self.puzzle.turn(side, layer_min, layer_max, from, to)
+                self.puzzle.turn(Turn::Side(SideTurn {
+                    side,
+                    layer_min,
+                    layer_max,
+                    from,
+                    to,
+                }))
             }
         }
     }
