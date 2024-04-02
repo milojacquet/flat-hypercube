@@ -30,7 +30,7 @@ const NEG_KEYS: &'static [char] = &['w', 'c', 'r', 'd', 'g', 'h', 'b', 'a'];
 const POS_KEYS_RIGHT: &'static [char] = &['l', 'i', 'j', '.', 'p', '['];
 const NEG_KEYS_RIGHT: &'static [char] = &['u', ',', 'o', 'k', 'l', ';'];
 const AXIS_KEYS: &'static [char] = &['k', 'j', 'l', 'i', 'u', 'o', 'p', ';'];
-const LAYER_KEYS: &'static [char] = &['1', '2', '3', '4', '5', '6', '7', '8'];
+const LAYER_KEYS: &'static [char] = &['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const ROT_KEY: char = 'x';
 const SCRAMBLE_KEY: char = '=';
 const RESET_KEY: char = '-';
@@ -104,8 +104,8 @@ impl KeybindAxial {
 enum KeybindSet {
     ThreeKey, // MC7D, works in d dimensions, depends on axial flag
     FixedKey, // works in d dimensions, requires d-2 keypresses, depends on axial flag
-    // has addition inversion keys in 3d
-    XyzKey, // HSC, 4d only
+              // has addition inversion keys in 3d
+              //XyzKey, // HSC, 4d only
 }
 
 impl KeybindSet {
@@ -113,15 +113,15 @@ impl KeybindSet {
         match self {
             Self::ThreeKey => true,
             Self::FixedKey => n >= 3,
-            Self::XyzKey => n == 4,
+            //Self::XyzKey => n == 4,
         }
     }
 
     fn next(&self, n: i16) -> Self {
         let next = match self {
             Self::ThreeKey => Self::FixedKey,
-            Self::FixedKey => Self::XyzKey,
-            Self::XyzKey => Self::ThreeKey,
+            Self::FixedKey => Self::ThreeKey//Self::XyzKey,
+            //Self::XyzKey => Self::ThreeKey,
         };
         if !next.valid(n) {
             next.next(n)
@@ -134,7 +134,7 @@ impl KeybindSet {
         match self {
             Self::ThreeKey => "three-key".to_string(),
             Self::FixedKey => "fixed-key".to_string(),
-            Self::XyzKey => "xyz".to_string(),
+            //Self::XyzKey => "xyz".to_string(),
         }
     }
 }
@@ -428,8 +428,7 @@ impl AppState {
                         }
                     }
                 }
-            }
-            _ => todo!(),
+            } //_ => todo!(),
         }
     }
 
@@ -497,7 +496,16 @@ fn main() -> io::Result<()> {
     let d = args[2].parse().expect("must be integer");
     let compact = args[3..].contains(&"--compact".to_string());
     if d > 8 {
-        panic!("dimension should be less than or equal to 8")
+        println!("dimension should be less than or equal to 8");
+    }
+    if d < 1 {
+        panic!("dimension should be greater than 0");
+    }
+    if n > 19 {
+        panic!("side should be less than or equal to 19");
+    }
+    if d < 1 {
+        panic!("side should be greater than 0");
     }
     let mut state = AppState {
         puzzle: Puzzle::make_solved(n, d),
