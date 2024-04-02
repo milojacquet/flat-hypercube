@@ -279,7 +279,11 @@ impl AppState {
             KeybindSet::ThreeKey => {
                 let axis = self.get_axis_key(c);
 
-                if let Some(s) = axis {
+                if let (Some(s), true) = (
+                    axis,
+                    self.current_turn.side.is_some()
+                        || self.current_turn.layer == Some(TurnLayer::WholePuzzle),
+                ) {
                     if ax(s as i16) as u16 >= self.puzzle.d {
                         return;
                     }
@@ -475,7 +479,7 @@ impl AppState {
         self.undo_history.push(turn.clone());
         let turn_out = self.puzzle.turn(turn);
 
-        if self.puzzle.is_solved() {
+        if turn_out.is_some() && self.puzzle.is_solved() {
             self.message = Some("solved!".to_string());
         }
 
