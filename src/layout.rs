@@ -9,6 +9,7 @@ pub struct Layout {
     pub width: u16,
     pub height: u16,
     pub points: HashMap<(i16, i16), Vec<i16>>,
+    pub keybind_hints: HashMap<(i16, i16), Option<i16>>, // None: core, Some(i): side i
 }
 
 impl Layout {
@@ -17,6 +18,7 @@ impl Layout {
             width: 0,
             height: 0,
             points: HashMap::new(),
+            keybind_hints: HashMap::new(),
         }
     }
 
@@ -35,6 +37,9 @@ impl Layout {
         for ((x, y), val) in &self.points {
             out.points.insert((x + shift, *y), val.to_vec());
         }
+        for ((x, y), val) in &self.keybind_hints {
+            out.keybind_hints.insert((x + shift, *y), *val);
+        }
         out.width = (self.width as i16 + shift) as u16;
         out.height = self.height;
         out
@@ -44,6 +49,9 @@ impl Layout {
         let mut out = Self::new();
         for ((x, y), val) in &self.points {
             out.points.insert((*x, y + shift), val.to_vec());
+        }
+        for ((x, y), val) in &self.keybind_hints {
+            out.keybind_hints.insert((*x, y + shift), *val);
         }
         out.width = self.width;
         out.height = (self.height as i16 + shift) as u16;
@@ -154,40 +162,29 @@ impl Layout {
                 width: 1,
                 height: 1,
                 points: HashMap::from([((0, 0), vec![])]),
+                keybind_hints: HashMap::from([((0, 0), None)]),
             }
-        } else if d % 2 == 1 {
+        } else {
             let lower = Self::make_layout(n, ((d as i16) - 1) as u16, compact);
             let mut row = vec![];
 
             for i in once(-n).chain((-n + 1..n).step_by(2)).chain(once(n)) {
                 let mut lower = lower.clone().push_all(i).clean(n);
                 if i.abs() == n {
-                    lower = lower.squish_horiz();
+                    if d % 2 == 1 {
+                        lower = lower.squish_horiz();
+                    } else {
+                        lower = lower.squish_vert();
+                    }
                 }
                 row.push(lower);
             }
-            Self::concat_horiz(row, gaps[d as usize])
-        } else {
-            let lower = Self::make_layout(n, ((d as i16) - 2) as u16, compact);
-            let mut grid = vec![];
-
-            for i in once(-n).chain((-n + 1..n).step_by(2)).chain(once(n)) {
-                let mut row = vec![];
-
-                for j in once(-n).chain((-n + 1..n).step_by(2)).chain(once(n)) {
-                    let mut lower = lower.clone().push_all(j).push_all(-i).clean(n);
-                    if i.abs() == n {
-                        lower = lower.squish_vert();
-                    }
-                    if j.abs() == n {
-                        lower = lower.squish_horiz();
-                    }
-                    row.push(lower);
-                }
-                grid.push(row);
+            if d % 2 == 1 {
+                Self::concat_horiz(row, gaps[d as usize])
+            } else {
+                row.reverse();
+                Self::concat_vert(row, gaps[d as usize])
             }
-
-            Self::concat_grid(grid, gaps[d as usize - 1], gaps[d as usize])
         }
     }
 }
