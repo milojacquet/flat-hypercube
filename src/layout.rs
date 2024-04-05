@@ -87,6 +87,7 @@ impl Layout {
 
     fn union(&mut self, other: Self) -> &mut Self {
         self.points.extend(other.points);
+        self.keybind_hints.extend(other.keybind_hints);
         self.width = self.width.max(other.width);
         self.height = self.height.max(other.height);
         self
@@ -162,7 +163,11 @@ impl Layout {
                 width: 1,
                 height: 1,
                 points: HashMap::from([((0, 0), vec![])]),
-                keybind_hints: HashMap::from([((0, 0), None)]),
+                keybind_hints: if n > 2 {
+                    HashMap::from([((0, 0), None)])
+                } else {
+                    HashMap::new()
+                },
             }
         } else {
             let lower = Self::make_layout(n, ((d as i16) - 1) as u16, compact);
@@ -177,6 +182,23 @@ impl Layout {
                         lower = lower.squish_vert();
                     }
                 }
+
+                lower.keybind_hints.retain(|_pos, side| {
+                    let keep;
+                    if i == -n + 1 {
+                        keep = side.is_none();
+                        *side = Some(!((d - 1) as i16));
+                    } else if i == n - 1 {
+                        keep = side.is_none();
+                        *side = Some((d - 1) as i16);
+                    } else if i == 0 || i == 1 {
+                        keep = true;
+                    } else {
+                        keep = false;
+                    }
+                    keep
+                });
+
                 row.push(lower);
             }
             if d % 2 == 1 {

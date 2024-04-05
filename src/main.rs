@@ -521,6 +521,8 @@ fn main() -> io::Result<()> {
         redo_history: Default::default(),
     };
     let layout = Layout::make_layout(n, d, compact).move_right(1);
+    //println!("{:?}", layout.keybind_hints);
+    //return Ok(());
 
     let mut stdout = io::stdout();
     terminal::enable_raw_mode()?;
@@ -577,7 +579,10 @@ fn main() -> io::Result<()> {
                     ch = NEG_NAMES[(!side) as usize];
                     color = NEG_COLORS[(!side) as usize];
                 }
-            } else {
+                stdout
+                    .queue(cursor::MoveTo(*x as u16, *y as u16))?
+                    .queue(style::PrintStyledContent(ch.with(color)))?;
+            } else if !matches!(layout.keybind_hints.get(&(*x, *y)), Some(Some(_))) {
                 if state.alert % (ALERT_FRAMES * 2) >= ALERT_FRAMES {
                     ch = "+";
                     color = ALERT_COLOR;
@@ -585,10 +590,49 @@ fn main() -> io::Result<()> {
                     ch = "·";
                     color = PIECE_COLOR;
                 }
+                stdout
+                    .queue(cursor::MoveTo(*x as u16, *y as u16))?
+                    .queue(style::PrintStyledContent(ch.with(color)))?;
             }
-            stdout
-                .queue(cursor::MoveTo(*x as u16, *y as u16))?
-                .queue(style::PrintStyledContent(ch.with(color)))?;
+        }
+
+        for ((x, y), side) in &layout.keybind_hints {
+            // in this loop we are more efficient by not flushing the buffer.
+            let ch;
+            let color;
+            if let Some(side) = side {
+                ch = match state.current_turn.side {
+                    None => {
+                        if *side >= 0 {
+                            POS_KEYS[*side as usize]
+                        } else {
+                            NEG_KEYS[(!side) as usize]
+                        }
+                    }
+                    Some(_) => match state.keybind_axial {
+                        KeybindAxial::Axial => {
+                            if *side >= 0 {
+                                AXIS_KEYS[*side as usize]
+                            } else {
+                                '·'
+                            }
+                        }
+                        KeybindAxial::Side => {
+                            if *side >= 0 {
+                                POS_KEYS_RIGHT[*side as usize]
+                            } else {
+                                NEG_KEYS_RIGHT[(!side) as usize]
+                            }
+                        }
+                    },
+                };
+                color = PIECE_COLOR;
+
+                stdout
+                    .queue(cursor::MoveTo(*x as u16, *y as u16))?
+                    .queue(style::PrintStyledContent(ch.with(color)))?;
+            }
+            //state.message = format!("{:?}", (x, y, side)).into();
         }
 
         stdout
