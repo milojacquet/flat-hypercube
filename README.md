@@ -33,3 +33,7 @@ This mode is most similar to Magic Cube 7D. To make a turn, first use the side s
 In this mode, first use the side selector, then use enough axis keys to fix the rotation to occur in a plane. Once you complete a move, you can continue to use axis keys to do additional moves on the same side. To do a whole-puzzle rotation, include <kbd>X</kbd> somewhere in the sequence before the end. Once you complete a move, you can continue to use axis keys to do additional moves on the same side.
 
 In three dimensions, just pressing a side selector key rotates that side counterclockwise. To rotate it clockwise, use the corresponding face selector key from side mode.
+
+## Saving and loading
+
+Not yet

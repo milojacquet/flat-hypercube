@@ -601,15 +601,16 @@ fn main() -> io::Result<()> {
             let ch;
             let color;
             if let Some(side) = side {
-                ch = match state.current_turn.side {
-                    None => {
-                        if *side >= 0 {
-                            POS_KEYS[*side as usize]
-                        } else {
-                            NEG_KEYS[(!side) as usize]
-                        }
+                ch = if state.current_turn.side.is_none()
+                    || (state.keybind_set == KeybindSet::FixedKey && state.puzzle.d == 3)
+                {
+                    if *side >= 0 {
+                        POS_KEYS[*side as usize]
+                    } else {
+                        NEG_KEYS[(!side) as usize]
                     }
-                    Some(_) => match state.keybind_axial {
+                } else {
+                    match state.keybind_axial {
                         KeybindAxial::Axial => {
                             if *side >= 0 {
                                 AXIS_KEYS[*side as usize]
@@ -624,7 +625,7 @@ fn main() -> io::Result<()> {
                                 NEG_KEYS_RIGHT[(!side) as usize]
                             }
                         }
-                    },
+                    }
                 };
                 color = PIECE_COLOR;
 
