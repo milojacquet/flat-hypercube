@@ -2,7 +2,7 @@
 
 This is a program that allows you to solve hypercubes in up to 8 dimensions using a flat projection. It supports keybinds.
 
-The projection is recursive in the number of dimensions. A puzzle of dimension 0 just has a single piece with no stickers: the core. When a dimension is added, multiple copies of the previous dimension's puzzle are placed next to each other, along with a cap on either end. In each cap, the stickers from the lower-dimensional puzzle have been removed and the stickers have been replaced with pieces. The middle puzzles represent the layers of the puzzle along the new dimension, and the caps represent the two new facets added along this direction.
+The projection is recursive in the number of dimensions. A puzzle of dimension 0 just has a single piece with no stickers: the core. When a dimension is added, multiple copies of the previous dimension's puzzle are placed next to each other, along with a cap on either end. In each cap, the stickers from the lower-dimensional puzzle have been removed and the stickers have been replaced with pieces. The middle puzzles represent the layers of the puzzle along the new dimension, and the caps represent the two new facets added along this direction. The layout was inspired by Don Hatch's layout in [MagicCubeNdSolve](http://www.plunk.org/~hatch/MagicCubeNdSolve/).
 
 ### Use
 
