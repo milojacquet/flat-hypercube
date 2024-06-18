@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::iter::once;
 
-const GAPS: &'static [i16] = &[0, 1, 0, 2, 1, 10, 4, 40, 18];
-const GAPS_COMPACT: &'static [i16] = &[0, 1, 0, 1, 0, 1, 0, 1, 0];
+const GAPS: &[i16] = &[0, 1, 0, 2, 1, 10, 4, 40, 18];
+const GAPS_COMPACT: &[i16] = &[0, 1, 0, 1, 0, 1, 0, 1, 0];
 
 #[derive(Debug, Clone)]
 pub struct Layout {
@@ -191,11 +191,9 @@ impl Layout {
                     } else if i == n - 1 {
                         keep = side.is_none();
                         *side = Some((d - 1) as i16);
-                    } else if i == 0 || i == 1 {
-                        keep = true;
                     } else {
-                        keep = false;
-                    }
+                        keep = i == 0 || i == 1
+                    };
                     keep
                 });
 

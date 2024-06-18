@@ -8,7 +8,7 @@ The projection is recursive in the number of dimensions. A puzzle of dimension 0
 
 To start the program, use the command `cargo run --release [n] [d]` to produce an `n^d` puzzle. Use `--compact` at the end to move the stickers closer to each other, which can help on smaller screens.
 
-This program supports multiple methods of interaction. In all modes, pressing <kbd>=</kbd> 5 times scrambles the puzzle, and pressing <kbd>-</kbd> 5 times resets the puzzle. <kbd>Esc</kbd> quits the program. <kbd>Z</kbd> undoes the most recent move, and <kbd>Shift</kbd>+<kbd>Z</kbd> redoes it. 
+This program supports multiple methods of interaction. In all modes, pressing <kbd>=</kbd> 5 times scrambles the puzzle, and pressing <kbd>-</kbd> 5 times resets the puzzle. <kbd>Ctrl</kbd>+<kbd>C</kbd> quits the program. <kbd>Z</kbd> undoes the most recent move, and <kbd>Shift</kbd>+<kbd>Z</kbd> redoes it. 
 
 There are multiple systems to turn the puzzle. <kbd>\\</kbd> cycles between them. In all of them, using <kbd>1</kbd> through <kbd>9</kbd> before a turn sequence selects the layer of the puzzle starting from the outermost.
 

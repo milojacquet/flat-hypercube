@@ -120,8 +120,8 @@ impl KeybindSet {
     fn next(&self, n: i16) -> Self {
         let next = match self {
             Self::ThreeKey => Self::FixedKey,
-            Self::FixedKey => Self::ThreeKey//Self::XyzKey,
-            //Self::XyzKey => Self::ThreeKey,
+            Self::FixedKey => Self::ThreeKey, //Self::XyzKey,
+                                              //Self::XyzKey => Self::ThreeKey,
         };
         if !next.valid(n) {
             next.next(n)
@@ -284,7 +284,7 @@ impl AppState {
                     self.current_turn.side.is_some()
                         || self.current_turn.layer == Some(TurnLayer::WholePuzzle),
                 ) {
-                    if ax(s as i16) as u16 >= self.puzzle.d {
+                    if ax(s) as u16 >= self.puzzle.d {
                         return;
                     }
                     self.current_keys.push(c);
@@ -299,20 +299,16 @@ impl AppState {
 
                     if let Some(side) = side {
                         if let Some(from) = self.current_turn.from {
-                            let turn_out = self.perform_turn(side, from, s as i16);
+                            let turn_out = self.perform_turn(side, from, s);
 
-                            match turn_out {
-                                None => {
-                                    self.alert = ALERT_FRAMES * 4 - 1;
-                                    self.current_keys = self.current_keys
-                                        [..self.current_keys.len() - 2]
-                                        .to_string();
-                                }
-                                _ => (),
+                            if turn_out.is_none() {
+                                self.alert = ALERT_FRAMES * 4 - 1;
+                                self.current_keys =
+                                    self.current_keys[..self.current_keys.len() - 2].to_string();
                             }
                             self.current_turn.from = None;
                         } else {
-                            self.current_turn.from = Some(s as i16);
+                            self.current_turn.from = Some(s);
                         }
                     }
                 }
@@ -352,12 +348,10 @@ impl AppState {
                         } else {
                             self.perform_turn(side, (side + 2) % 3, (side + 1) % 3);
                         }
+                    } else if side < 0 {
+                        self.perform_turn(side, (!side + 2) % 3, (!side + 1) % 3);
                     } else {
-                        if side < 0 {
-                            self.perform_turn(side, (!side + 2) % 3, (!side + 1) % 3);
-                        } else {
-                            self.perform_turn(side, (side + 1) % 3, (side + 2) % 3);
-                        }
+                        self.perform_turn(side, (side + 1) % 3, (side + 2) % 3);
                     }
                 }
             }
@@ -365,7 +359,6 @@ impl AppState {
                 let axis = self.get_axis_key(c);
 
                 if let Some(s) = axis {
-                    let s = s as i16;
                     if ax(s) as u16 >= self.puzzle.d {
                         return;
                     }
@@ -415,14 +408,11 @@ impl AppState {
                                 self.perform_turn(side, from, to)
                             });
 
-                            match turn_out {
-                                None => {
-                                    self.alert = ALERT_FRAMES * 4 - 1;
-                                    self.current_keys = self.current_keys
-                                        [..self.current_keys.len() - self.current_turn.fixed.len()]
-                                        .to_string();
-                                }
-                                _ => (),
+                            if turn_out.is_none() {
+                                self.alert = ALERT_FRAMES * 4 - 1;
+                                self.current_keys = self.current_keys
+                                    [..self.current_keys.len() - self.current_turn.fixed.len()]
+                                    .to_string();
                             }
                             self.current_turn.fixed = vec![];
                         }
@@ -534,22 +524,22 @@ fn main() -> io::Result<()> {
 
         let previous_message = state.get_message();
         if event::poll(Duration::from_millis(0))? {
-            match event::read()? {
-                Event::Key(KeyEvent {
-                    code,
-                    kind: KeyEventKind::Press,
-                    modifiers,
-                    ..
-                }) => match code {
+            if let Event::Key(KeyEvent {
+                code,
+                kind: KeyEventKind::Press,
+                modifiers,
+                ..
+            }) = event::read()?
+            {
+                match code {
+                    KeyCode::Char('c') if modifiers.contains(KeyModifiers::CONTROL) => {
+                        break;
+                    }
                     KeyCode::Char(c) => {
                         state.process_key(c, modifiers);
                     }
-                    KeyCode::Esc => {
-                        break ();
-                    }
                     _ => (),
-                },
-                _ => (),
+                }
             }
         }
 
