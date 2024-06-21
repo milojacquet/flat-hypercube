@@ -23,13 +23,13 @@ const fn hex(hex: u32) -> Color {
     }
 }
 
-const POS_NAMES: &'static [&'static str] = &["R", "U", "F", "O", "A", "Γ", "Θ", "Ξ"];
-const NEG_NAMES: &'static [&'static str] = &["L", "D", "B", "I", "P", "Δ", "Λ", "Π"];
-const POS_KEYS: &'static [char] = &['f', 'e', 's', 'v', 't', 'y', 'n', 'q'];
-const NEG_KEYS: &'static [char] = &['w', 'c', 'r', 'd', 'g', 'h', 'b', 'a'];
+const POS_NAMES: &'static [&'static str] = &["R", "U", "F", "O", "A", "Γ", "Θ", "Ξ", "Σ", "Ψ"];
+const NEG_NAMES: &'static [&'static str] = &["L", "D", "B", "I", "P", "Δ", "Λ", "Π", "Φ", "Ω"];
+const POS_KEYS: &'static [char] = &['f', 'e', 's', 'v', 't', 'y', 'n', 'q', ',', '/'];
+const NEG_KEYS: &'static [char] = &['w', 'c', 'r', 'd', 'g', 'h', 'b', 'a', 'm', '.'];
 const POS_KEYS_RIGHT: &'static [char] = &['l', 'i', 'j', '.', 'p', '['];
 const NEG_KEYS_RIGHT: &'static [char] = &['u', ',', 'o', 'k', 'l', ';'];
-const AXIS_KEYS: &'static [char] = &['k', 'j', 'l', 'i', 'u', 'o', 'p', ';'];
+const AXIS_KEYS: &'static [char] = &['k', 'j', 'l', 'i', 'u', 'o', 'p', ';', '[', '\''];
 const LAYER_KEYS: &'static [char] = &['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const ROT_KEY: char = 'x';
 const SCRAMBLE_KEY: char = '=';
@@ -39,6 +39,8 @@ const KEYBIND_KEY: char = '\\';
 const KEYBIND_AXIAL_KEY: char = '|';
 const UNDO_KEY: char = 'z';
 const REDO_KEY: char = 'Z';
+const MAX_DIM: u16 = 10;
+const MAX_LAYERS: i16 = 19;
 
 const POS_COLORS: &'static [Color] = &[
     hex(0xff0000),
@@ -49,6 +51,8 @@ const POS_COLORS: &'static [Color] = &[
     hex(0x774811),
     hex(0xf49fef),
     hex(0xb29867),
+    hex(0x9cf542),
+    hex(0x078517),
 ];
 const NEG_COLORS: &'static [Color] = &[
     hex(0xff8000),
@@ -57,8 +61,10 @@ const NEG_COLORS: &'static [Color] = &[
     hex(0x8f10ea),
     hex(0x7daa0a),
     hex(0x6d4564),
-    hex(0xb29867),
+    hex(0xd4a94e),
     hex(0xb27967),
+    hex(0x42d4f5),
+    hex(0x2f2fbd),
 ];
 const PIECE_COLOR: Color = hex(0x808080);
 const ALERT_COLOR: Color = hex(0xd86c6c);
@@ -485,13 +491,13 @@ fn main() -> io::Result<()> {
     let n = args[1].parse().expect("must be integer");
     let d = args[2].parse().expect("must be integer");
     let compact = args[3..].contains(&"--compact".to_string());
-    if d > 8 {
+    if d > MAX_DIM {
         println!("dimension should be less than or equal to 8");
     }
     if d < 1 {
         panic!("dimension should be greater than 0");
     }
-    if n > 19 {
+    if n > MAX_LAYERS {
         panic!("side should be less than or equal to 19");
     }
     if d < 1 {

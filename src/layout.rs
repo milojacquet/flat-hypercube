@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::iter::once;
 
-const GAPS: &[i16] = &[0, 1, 0, 2, 1, 10, 4, 40, 18];
-const GAPS_COMPACT: &[i16] = &[0, 1, 0, 1, 0, 1, 0, 1, 0];
+const GAPS: &[i16] = &[0, 1, 0, 2, 1, 10, 4, 40, 18, 160, 72];
+const GAPS_COMPACT: &[i16] = &[0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0];
 
 #[derive(Debug, Clone)]
 pub struct Layout {
