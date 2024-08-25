@@ -1,3 +1,4 @@
+use clap::Parser;
 use crossterm::{
     cursor,
     event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
@@ -7,7 +8,6 @@ use crossterm::{
 use layout::Layout;
 use puzzle::{ax, Puzzle, PuzzleTurn, SideTurn, Turn};
 use rand::prelude::*;
-use std::env;
 use std::io::{self, Write};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
@@ -486,25 +486,35 @@ impl AppState {
     }
 }
 
+/// Flat hypercube simulator
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    n: i16,
+    d: u16,
+
+    /// Display in compact mode
+    #[arg(short, long)]
+    compact: bool,
+}
+
 fn main() -> io::Result<()> {
-    let args: Vec<String> = env::args().collect();
-    let n = args[1].parse().expect("must be integer");
-    let d = args[2].parse().expect("must be integer");
-    let compact = args[3..].contains(&"--compact".to_string());
-    if d > MAX_DIM {
+    let args = Args::parse();
+
+    if args.d > MAX_DIM {
         println!("dimension should be less than or equal to 8");
     }
-    if d < 1 {
+    if args.d < 1 {
         panic!("dimension should be greater than 0");
     }
-    if n > MAX_LAYERS {
+    if args.n > MAX_LAYERS {
         panic!("side should be less than or equal to 19");
     }
-    if d < 1 {
+    if args.d < 1 {
         panic!("side should be greater than 0");
     }
     let mut state = AppState {
-        puzzle: Puzzle::make_solved(n, d),
+        puzzle: Puzzle::make_solved(args.n, args.d),
         current_keys: "".to_string(),
         current_turn: Default::default(),
         alert: Default::default(),
@@ -516,7 +526,7 @@ fn main() -> io::Result<()> {
         undo_history: Default::default(),
         redo_history: Default::default(),
     };
-    let layout = Layout::make_layout(n, d, compact).move_right(1);
+    let layout = Layout::make_layout(args.n, args.d, args.compact).move_right(1);
     //println!("{:?}", layout.keybind_hints);
     //return Ok(());
 
@@ -566,7 +576,7 @@ fn main() -> io::Result<()> {
             // in this loop we are more efficient by not flushing the buffer.
             let ch;
             let color;
-            if pos.iter().any(|x| x.abs() == n) {
+            if pos.iter().any(|x| x.abs() == args.n) {
                 let side = state.puzzle.stickers[pos];
                 if side >= 0 {
                     ch = POS_NAMES[side as usize];
