@@ -44,7 +44,7 @@ Not yet
 
 Flat hypercube supports passing piece filters from a file via the `--filters` flag. Each line of the file should contain one filter. A filter consisters of a sequence of terms separated by `+`, where each term consists of the names of some facets, optionally followed by `!` and more facets. Each term corresponds to a cuboidal filter that shows pieces that have colors named before the `!` and do not have colors named after the `!`, where the colors are named after their solved side. The filter shows all pieces that are shown in at least one term. To use the next filter, use <kbd>Shift</kbd>+<kbd>K</kbd>, and to use the previous filter, use <kbd>Shift</kbd>+<kbd>J</kbd>.
 
-Live filter creation is also supported. To do this, use use <kbd>Shift</kbd>+<kbd>F</kbd> to enter live filter mode. Facet names are entered via their selector keybind, and `+` and `!` are entered normally. To confirm, use <kbd>Esc</kbd>, and to cancel, use <kbd>Esc</kbd>.
+Live filter creation is also supported. To do this, use use <kbd>Shift</kbd>+<kbd>F</kbd> to enter live filter mode. Facet names are entered via their selector keybind, and `+` and `!` are entered normally. To confirm, use <kbd>Enter</kbd>, and to cancel, use <kbd>Esc</kbd>.
 
 ## Miscellaneous
 
