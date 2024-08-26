@@ -2,7 +2,7 @@ use crate::NEG_NAMES;
 use crate::POS_NAMES;
 use std::str::FromStr;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct FilterSide {
     have: bool,
     color: i16,
@@ -12,8 +12,14 @@ struct FilterSide {
 // (true: i16) = must have color i16
 // (false: i16) = must not have color i16
 // disjunction of conjunctions
-#[derive(Debug, Default)]
+#[derive(Debug, Clone)]
 pub struct Filter(Vec<Vec<FilterSide>>);
+
+impl Default for Filter {
+    fn default() -> Self {
+        Filter(vec![vec![]])
+    }
+}
 
 impl FromStr for Filter {
     type Err = String;
