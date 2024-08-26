@@ -28,8 +28,8 @@ const fn hex(hex: u32) -> Color {
 
 const POS_NAMES: &'static [char] = &['R', 'U', 'F', 'O', 'A', 'Γ', 'Θ', 'Ξ', 'Σ', 'Ψ'];
 const NEG_NAMES: &'static [char] = &['L', 'D', 'B', 'I', 'P', 'Δ', 'Λ', 'Π', 'Φ', 'Ω'];
-const POS_KEYS: &'static [char] = &['f', 'e', 's', 'v', 't', 'y', 'n', 'q', ',', '/'];
-const NEG_KEYS: &'static [char] = &['w', 'c', 'r', 'd', 'g', 'h', 'b', 'a', 'm', '.'];
+const POS_KEYS: &'static [char] = &['f', 'e', 'r', 't', 'v', 'y', 'n', 'q', ',', '/'];
+const NEG_KEYS: &'static [char] = &['s', 'd', 'w', 'g', 'c', 'h', 'b', 'a', 'm', '.'];
 const POS_KEYS_RIGHT: &'static [char] = &['l', 'i', 'j', '.', 'p', '['];
 const NEG_KEYS_RIGHT: &'static [char] = &['u', ',', 'o', 'k', 'l', ';'];
 const AXIS_KEYS: &'static [char] = &['k', 'j', 'l', 'i', 'u', 'o', 'p', ';', '[', '\''];

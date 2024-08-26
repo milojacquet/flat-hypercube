@@ -34,7 +34,7 @@ jobs:
       - name: Upload release
         uses: actions/upload-artifact@v4
         with:
-          name: flat_hypercube
+          name: flat_hypercube_windows
           path: release/*
 
   linux:
@@ -61,7 +61,7 @@ jobs:
       - name: Upload release
         uses: actions/upload-artifact@v4
         with:
-          name: flat_hypercube
+          name: flat_hypercube_linux
           path: flat_hypercube.tar.gz
 
   macos:
@@ -99,5 +99,5 @@ jobs:
       - name: Upload release
         uses: actions/upload-artifact@v4
         with:
-          name: flat_hypercube
+          name: flat_hypercube_macos
           path: flat_hypercube.tar.gz

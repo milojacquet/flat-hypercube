@@ -15,11 +15,11 @@ There are multiple systems to turn the puzzle. <kbd>\\</kbd> cycles between them
 Each side has several keys that can be used to access it in different contexts. The selector is usually used at the beginning of the key combination to select which side to turn. The other set of keys is used to determine which direction the side should turn. When in axis mode, these keys only refer to the positive direction on each axis, and when in side mode, there are keys for both sides. Axis mode and side mode can be toggled with <kbd>Shift</kbd>+<kbd>\\</kbd>. 
 | Side (+/-) | Selector | Axis mode | Side mode |
 | -------- | ------- | ------- | ------- |
-| R, L | <kbd>F</kbd>, <kbd>W</kbd> | <kbd>K</kbd> | <kbd>L</kbd>, <kbd>U</kbd> |
-| U, D | <kbd>E</kbd>, <kbd>C</kbd> | <kbd>J</kbd> | <kbd>I</kbd>, <kbd>,</kbd> |
-| F, B | <kbd>S</kbd>, <kbd>R</kbd> | <kbd>L</kbd> | <kbd>J</kbd>, <kbd>O</kbd> |
-| O, I | <kbd>V</kbd>, <kbd>D</kbd> | <kbd>I</kbd> | <kbd>.</kbd>, <kbd>K</kbd> |
-| A, P | <kbd>T</kbd>, <kbd>G</kbd> | <kbd>U</kbd> | <kbd>P</kbd>, <kbd>L</kbd> |
+| R, L | <kbd>F</kbd>, <kbd>S</kbd> | <kbd>K</kbd> | <kbd>L</kbd>, <kbd>U</kbd> |
+| U, D | <kbd>E</kbd>, <kbd>D</kbd> | <kbd>J</kbd> | <kbd>I</kbd>, <kbd>,</kbd> |
+| F, B | <kbd>R</kbd>, <kbd>W</kbd> | <kbd>L</kbd> | <kbd>J</kbd>, <kbd>O</kbd> |
+| O, I | <kbd>T</kbd>, <kbd>G</kbd> | <kbd>I</kbd> | <kbd>.</kbd>, <kbd>K</kbd> |
+| A, P | <kbd>V</kbd>, <kbd>C</kbd> | <kbd>U</kbd> | <kbd>P</kbd>, <kbd>L</kbd> |
 | Γ, Δ | <kbd>Y</kbd>, <kbd>H</kbd> | <kbd>O</kbd> | <kbd>[</kbd>, <kbd>;</kbd> |
 | Θ, Λ | <kbd>N</kbd>, <kbd>B</kbd> | <kbd>P</kbd> | N/A |
 | Ξ, Π | <kbd>Q</kbd>, <kbd>A</kbd> | <kbd>;</kbd> | N/A |
