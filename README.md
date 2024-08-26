@@ -42,7 +42,7 @@ Not yet
 
 ## Piece filters
 
-Flat hypercube supports passing piece filters from a file via the `--filters` flag. Each line of the file should contain one filter. A filter consisters of a sequence of terms separated by `+`, where each term consists of the names of some facets, optionally followed by `!` and more facets. Each term corresponds to a cuboidal filter that shows pieces that have colors named before the `!` and do not haev colors named after the `!`. The filter shows all pieces that are shown in at least one term. To use the next filter, use <kbd>Shift</kbd>+<kbd>K</kbd>, and to use the previous filter, use <kbd>Shift</kbd>+<kbd>J</kbd>.
+Flat hypercube supports passing piece filters from a file via the `--filters` flag. Each line of the file should contain one filter. A filter consisters of a sequence of terms separated by `+`, where each term consists of the names of some facets, optionally followed by `!` and more facets. Each term corresponds to a cuboidal filter that shows pieces that have colors named before the `!` and do not have colors named after the `!`, where the colors are named after their solved side. The filter shows all pieces that are shown in at least one term. To use the next filter, use <kbd>Shift</kbd>+<kbd>K</kbd>, and to use the previous filter, use <kbd>Shift</kbd>+<kbd>J</kbd>.
 
 ## Miscellaneous
 
