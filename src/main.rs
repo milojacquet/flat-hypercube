@@ -5,13 +5,16 @@ use crossterm::{
     style::{self, Color, Stylize},
     terminal, ExecutableCommand, QueueableCommand,
 };
+use filters::Filter;
 use layout::Layout;
 use puzzle::{ax, Puzzle, PuzzleTurn, SideTurn, Turn};
 use rand::prelude::*;
 use std::io::{self, Write};
+use std::path::PathBuf;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
+mod filters;
 mod layout;
 mod puzzle;
 
@@ -23,14 +26,15 @@ const fn hex(hex: u32) -> Color {
     }
 }
 
-const POS_NAMES: &'static [&'static str] = &["R", "U", "F", "O", "A", "Γ", "Θ", "Ξ", "Σ", "Ψ"];
-const NEG_NAMES: &'static [&'static str] = &["L", "D", "B", "I", "P", "Δ", "Λ", "Π", "Φ", "Ω"];
+const POS_NAMES: &'static [char] = &['R', 'U', 'F', 'O', 'A', 'Γ', 'Θ', 'Ξ', 'Σ', 'Ψ'];
+const NEG_NAMES: &'static [char] = &['L', 'D', 'B', 'I', 'P', 'Δ', 'Λ', 'Π', 'Φ', 'Ω'];
 const POS_KEYS: &'static [char] = &['f', 'e', 's', 'v', 't', 'y', 'n', 'q', ',', '/'];
 const NEG_KEYS: &'static [char] = &['w', 'c', 'r', 'd', 'g', 'h', 'b', 'a', 'm', '.'];
 const POS_KEYS_RIGHT: &'static [char] = &['l', 'i', 'j', '.', 'p', '['];
 const NEG_KEYS_RIGHT: &'static [char] = &['u', ',', 'o', 'k', 'l', ';'];
 const AXIS_KEYS: &'static [char] = &['k', 'j', 'l', 'i', 'u', 'o', 'p', ';', '[', '\''];
 const LAYER_KEYS: &'static [char] = &['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+const ESCAPE_CODE: char = '⎋';
 const ROT_KEY: char = 'x';
 const SCRAMBLE_KEY: char = '=';
 const RESET_KEY: char = '-';
@@ -39,6 +43,9 @@ const KEYBIND_KEY: char = '\\';
 const KEYBIND_AXIAL_KEY: char = '|';
 const UNDO_KEY: char = 'z';
 const REDO_KEY: char = 'Z';
+const NEXT_FILTER_KEY: char = 'K';
+const PREV_FILTER_KEY: char = 'J';
+const CLEAR_MESSAGE_KEY: char = ESCAPE_CODE;
 const MAX_DIM: u16 = 10;
 const MAX_LAYERS: i16 = 19;
 
@@ -67,6 +74,7 @@ const NEG_COLORS: &'static [Color] = &[
     hex(0x2f2fbd),
 ];
 const PIECE_COLOR: Color = hex(0x808080);
+const FILTERED_COLOR: Color = hex(0x505050);
 const ALERT_COLOR: Color = hex(0xd86c6c);
 const FRAME_LENGTH: Duration = Duration::from_millis(1000 / 30);
 const ALERT_FRAMES: u8 = 4;
@@ -157,6 +165,8 @@ struct AppState {
     message: Option<String>,
     undo_history: Vec<Turn>,
     redo_history: Vec<Turn>,
+    filters: Vec<Filter>,
+    filter_ind: usize,
 }
 
 impl AppState {
@@ -165,7 +175,7 @@ impl AppState {
         self.current_turn = Default::default();
     }
 
-    fn process_key(&mut self, c: char, _mods: KeyModifiers) {
+    fn process_key(&mut self, c: char, mods: KeyModifiers) {
         self.message = None;
         if c == SCRAMBLE_KEY || c == RESET_KEY {
             match self.damage_counter {
@@ -245,6 +255,18 @@ impl AppState {
                     self.undo_history.push(redid)
                 }
             }
+        } else if c == NEXT_FILTER_KEY {
+            self.flush_turn();
+            self.filter_ind += 1;
+            self.message = Some("next filter".to_string());
+        } else if c == PREV_FILTER_KEY {
+            self.flush_turn();
+            self.filter_ind -= 1;
+            self.message = Some("previous filter".to_string());
+        } else if c == CLEAR_MESSAGE_KEY {
+            self.current_turn = Default::default();
+            self.current_keys = Default::default();
+            self.message = None;
         } else if let Some(s) = LAYER_KEYS.iter().position(|ch| ch == &c) {
             if s as i16 >= self.puzzle.n {
                 return;
@@ -490,29 +512,44 @@ impl AppState {
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
+    /// Number of layers of the puzzle
     n: i16,
+    /// Dimension of the puzzle
     d: u16,
 
     /// Display in compact mode
     #[arg(short, long)]
     compact: bool,
+
+    /// File that contains the filters for the solve
+    #[arg(short, long)]
+    filters: Option<PathBuf>,
 }
 
 fn main() -> io::Result<()> {
     let args = Args::parse();
 
     if args.d > MAX_DIM {
-        println!("dimension should be less than or equal to 8");
+        panic!("dimension should be less than or equal to {MAX_DIM}");
     }
     if args.d < 1 {
         panic!("dimension should be greater than 0");
     }
     if args.n > MAX_LAYERS {
-        panic!("side should be less than or equal to 19");
+        panic!("side should be less than or equal to {MAX_LAYERS}");
     }
     if args.d < 1 {
         panic!("side should be greater than 0");
     }
+
+    let filters;
+    if let Some(path) = args.filters {
+        let filters_str = std::fs::read_to_string(path).expect("Invalid filter file");
+        filters = filters_str.lines().map(|l| l.parse().unwrap()).collect();
+    } else {
+        filters = vec![];
+    }
+
     let mut state = AppState {
         puzzle: Puzzle::make_solved(args.n, args.d),
         current_keys: "".to_string(),
@@ -525,6 +562,8 @@ fn main() -> io::Result<()> {
         message: Default::default(),
         undo_history: Default::default(),
         redo_history: Default::default(),
+        filters,
+        filter_ind: 0,
     };
     let layout = Layout::make_layout(args.n, args.d, args.compact).move_right(1);
     //println!("{:?}", layout.keybind_hints);
@@ -554,6 +593,12 @@ fn main() -> io::Result<()> {
                     KeyCode::Char(c) => {
                         state.process_key(c, modifiers);
                     }
+                    KeyCode::Tab => {
+                        state.process_key('\t', modifiers);
+                    }
+                    KeyCode::Esc => {
+                        state.process_key(ESCAPE_CODE, modifiers);
+                    }
                     _ => (),
                 }
             }
@@ -576,25 +621,39 @@ fn main() -> io::Result<()> {
             // in this loop we are more efficient by not flushing the buffer.
             let ch;
             let color;
+            let in_filter = state
+                .filters
+                .get(state.filter_ind)
+                .map(|filter| filter.matches_stickers(&state.puzzle.stickers(pos)))
+                .unwrap_or(true);
             if pos.iter().any(|x| x.abs() == args.n) {
                 let side = state.puzzle.stickers[pos];
-                if side >= 0 {
-                    ch = POS_NAMES[side as usize];
-                    color = POS_COLORS[side as usize];
+                ch = if side >= 0 {
+                    POS_NAMES[side as usize]
                 } else {
-                    ch = NEG_NAMES[(!side) as usize];
-                    color = NEG_COLORS[(!side) as usize];
-                }
+                    NEG_NAMES[(!side) as usize]
+                };
+                color = if !in_filter {
+                    FILTERED_COLOR
+                } else if side >= 0 {
+                    POS_COLORS[side as usize]
+                } else {
+                    NEG_COLORS[(!side) as usize]
+                };
                 stdout
                     .queue(cursor::MoveTo(*x as u16, *y as u16))?
                     .queue(style::PrintStyledContent(ch.with(color)))?;
             } else if !matches!(layout.keybind_hints.get(&(*x, *y)), Some(Some(_))) {
                 if state.alert % (ALERT_FRAMES * 2) >= ALERT_FRAMES {
-                    ch = "+";
+                    ch = '+';
                     color = ALERT_COLOR;
                 } else {
-                    ch = "·";
-                    color = PIECE_COLOR;
+                    ch = '·';
+                    color = if in_filter {
+                        PIECE_COLOR
+                    } else {
+                        FILTERED_COLOR
+                    };
                 }
                 stdout
                     .queue(cursor::MoveTo(*x as u16, *y as u16))?

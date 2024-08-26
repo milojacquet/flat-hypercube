@@ -125,22 +125,6 @@ impl Layout {
         out
     }
 
-    fn concat_grid(mut layouts: Vec<Vec<Self>>, gap_horiz: i16, gap_vert: i16) -> Self {
-        for i in 0..layouts[0].len() {
-            let max_width = layouts.iter().map(|row| row[i].width).max().unwrap_or(0);
-            for j in 0..layouts.len() {
-                layouts[j][i].width = max_width;
-            }
-        }
-        Layout::concat_vert(
-            layouts
-                .iter()
-                .map(|row| Layout::concat_horiz(row.to_vec(), gap_horiz))
-                .collect(),
-            gap_vert,
-        )
-    }
-
     fn clean(mut self, n: i16) -> Self {
         self.points
             .retain(|_key, val| val.iter().filter(|x| x.abs() == n).count() <= 1);

@@ -173,4 +173,38 @@ impl Puzzle {
             Turn::Puzzle(t) => self.puzzle_rotate(t),
         }
     }
+
+    fn piece_body(&self, piece: &[i16]) -> Vec<i16> {
+        if let Some(ind) = piece.iter().position(|x| x.abs() == self.n) {
+            let mut piece_body = piece.to_vec();
+            if piece[ind] == self.n {
+                piece_body[ind] -= 1;
+            } else {
+                piece_body[ind] += 1;
+            }
+            piece_body
+        } else {
+            piece.to_vec()
+        }
+    }
+
+    fn piece_body_stickers(&self, piece: &[i16]) -> Vec<i16> {
+        let mut colors = vec![];
+        for (ind, x) in piece.into_iter().enumerate() {
+            let mut piece = piece.to_vec();
+            if *x == self.n - 1 {
+                piece[ind] += 1;
+            } else if *x == -(self.n - 1) {
+                piece[ind] -= 1;
+            } else {
+                continue;
+            }
+            colors.push(self.stickers[&piece]);
+        }
+        colors
+    }
+
+    pub fn stickers(&self, piece: &[i16]) -> Vec<i16> {
+        self.piece_body_stickers(&self.piece_body(piece))
+    }
 }

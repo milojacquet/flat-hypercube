@@ -6,7 +6,7 @@ The projection is recursive in the number of dimensions. A puzzle of dimension 0
 
 ### Use
 
-To start the program, use the command `cargo run --release [n] [d]` to produce an `n^d` puzzle. Use `--compact` at the end to move the stickers closer to each other, which can help on smaller screens.
+To start the program, run it with the arguments `[n] [d]` to produce an `n^d` puzzle. Use `--compact` to move the stickers closer to each other, which can help on smaller screens.
 
 This program supports multiple methods of interaction. In all modes, pressing <kbd>=</kbd> 5 times scrambles the puzzle, and pressing <kbd>-</kbd> 5 times resets the puzzle. <kbd>Ctrl</kbd>+<kbd>C</kbd> quits the program. <kbd>Z</kbd> undoes the most recent move, and <kbd>Shift</kbd>+<kbd>Z</kbd> redoes it. 
 
@@ -39,3 +39,11 @@ In three dimensions, just pressing a side selector key rotates that side counter
 ## Saving and loading
 
 Not yet
+
+## Piece filters
+
+Flat hypercube supports passing piece filters from a file via the `--filters` flag. Each line of the file should contain one filter. A filter consisters of a sequence of terms separated by `+`, where each term consists of the names of some facets, optionally followed by `!` and more facets. Each term corresponds to a cuboidal filter that shows pieces that have colors named before the `!` and do not haev colors named after the `!`. The filter shows all pieces that are shown in at least one term. To use the next filter, use <kbd>Shift</kbd>+<kbd>K</kbd>, and to use the previous filter, use <kbd>Shift</kbd>+<kbd>J</kbd>.
+
+## Miscellaneous
+
+The status message can be cleared and keybind hints returned to default by pressing <kbd>Esc</kbd>. 
