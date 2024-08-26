@@ -6,7 +6,7 @@ The projection is recursive in the number of dimensions. A puzzle of dimension 0
 
 ### Use
 
-To start the program, download it from [releases](https://github.com/milojacquet/flat-hypercube/releases/latest) run it with the arguments `[n] [d]` to produce an `n^d` puzzle. Use `--compact` to move the stickers closer to each other, which can help on smaller screens.
+To start the program, download it from [releases](https://github.com/milojacquet/flat-hypercube/releases/latest) and run it with the arguments `[n] [d]` to produce an `n^d` puzzle. Use `--compact` to move the stickers closer to each other, which can help on smaller screens.
 
 This program supports multiple methods of interaction. In all modes, pressing <kbd>=</kbd> 5 times scrambles the puzzle, and pressing <kbd>-</kbd> 5 times resets the puzzle. <kbd>Ctrl</kbd>+<kbd>C</kbd> quits the program. <kbd>Z</kbd> undoes the most recent move, and <kbd>Shift</kbd>+<kbd>Z</kbd> redoes it. 
 
