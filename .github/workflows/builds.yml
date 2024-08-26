@@ -1,0 +1,103 @@
+name: build
+
+on:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+
+  windows:
+    name: Build Windows latest
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo
+      - uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            components: clippy
+            override: true
+      - name: Build Flat Hypercube
+        run: cargo build --release
+      - name: Assemble release
+        run: |
+          mkdir release
+          move target/release/flat-hypercube.exe release
+      - name: Upload release
+        uses: actions/upload-artifact@v4
+        with:
+          name: flat_hypercube
+          path: release/*
+
+  linux:
+    name: Build Linux latest
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo
+      - uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            components: clippy
+            override: true
+      - name: Build Flat Hypercube
+        run: cargo build --release
+      - name: Make tarball
+        run: tar -czf flat_hypercube.tar.gz -C target/release flat-hypercube
+      - name: Upload release
+        uses: actions/upload-artifact@v4
+        with:
+          name: flat_hypercube
+          path: flat_hypercube.tar.gz
+
+  macos:
+    name: Build macOS latest
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo
+      - uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            components: clippy
+            target: x86_64-apple-darwin
+            override: true
+      - name: Install cargo-bundle
+        uses: actions-rs/install@v0.1
+        with:
+          crate: cargo-bundle
+          version: latest
+          use-tool-cache: true
+      - name: Build Flat Hypercube (arm64)
+        run: cargo build --release
+      - name: Build Flat Hypercube (x86_64)
+        run: cargo build --release --target=x86_64-apple-darwin
+      - name: Merge universal binary
+        run: lipo -create -output target/release/flat-hypercube target/x86_64-apple-darwin/release/flat-hypercube target/release/flat-hypercube
+      - name: Make tarball
+        run: tar -czf flat_hypercube.tar.gz -C target/release flat-hypercube
+      - name: Upload release
+        uses: actions/upload-artifact@v4
+        with:
+          name: flat_hypercube
+          path: flat_hypercube.tar.gz
