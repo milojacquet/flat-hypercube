@@ -200,6 +200,10 @@ impl Puzzle {
                 continue;
             }
             colors.push(self.stickers[&piece]);
+            if self.n == 1 {
+                // the piece of a 1^d has two stickers per axis
+                colors.push(!self.stickers[&piece]);
+            }
         }
         colors
     }
