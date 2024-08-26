@@ -77,9 +77,9 @@ mod serde_map {
         K: Deserialize<'de> + std::hash::Hash + Eq,
         V: Deserialize<'de>,
     {
-        Ok(HashMap::from_iter(
-            <Vec<(K, V)>>::deserialize(deserializer)?.into_iter(),
-        ))
+        Ok(HashMap::from_iter(<Vec<(K, V)>>::deserialize(
+            deserializer,
+        )?))
     }
 }
 
@@ -168,7 +168,7 @@ impl Puzzle {
         }
 
         let mut new_stickers = HashMap::new();
-        for (pos, _color) in &self.stickers {
+        for pos in self.stickers.keys() {
             if (side >= 0 && layer_range.contains(&pos[side as usize]))
                 || (side < 0 && layer_range.contains(&pos[(!side) as usize]))
             {
@@ -189,7 +189,7 @@ impl Puzzle {
         }
 
         let mut new_stickers = HashMap::new();
-        for (pos, _color) in &self.stickers {
+        for pos in self.stickers.keys() {
             let mut from_pos = pos.clone();
             from_pos[from as usize] = pos[to as usize];
             from_pos[to as usize] = -pos[from as usize];
@@ -222,7 +222,7 @@ impl Puzzle {
 
     fn piece_body_stickers(&self, piece: &[i16]) -> Vec<i16> {
         let mut colors = vec![];
-        for (ind, x) in piece.into_iter().enumerate() {
+        for (ind, x) in piece.iter().enumerate() {
             let mut piece = piece.to_vec();
             if *x == self.n - 1 {
                 piece[ind] += 1;

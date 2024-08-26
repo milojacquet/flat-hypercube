@@ -56,7 +56,7 @@ const SAVE_KEY: char = 'S';
 const MAX_DIM: u16 = 10;
 const MAX_LAYERS: i16 = 19;
 
-const POS_COLORS: &'static [Color] = &[
+const POS_COLORS: &[Color] = &[
     hex(0xff0000),
     hex(0xffffff),
     hex(0x00ff00),
@@ -68,7 +68,7 @@ const POS_COLORS: &'static [Color] = &[
     hex(0x9cf542),
     hex(0x078517),
 ];
-const NEG_COLORS: &'static [Color] = &[
+const NEG_COLORS: &[Color] = &[
     hex(0xff8000),
     hex(0xffff00),
     hex(0x0080ff),
@@ -695,7 +695,7 @@ fn main() -> io::Result<()> {
     if let Some(log_file) = args.log {
         let file = File::open(log_file)?;
         let reader = BufReader::new(file);
-        let app_log = serde_json::from_reader(reader).map_err(|e| std::io::Error::other(e))?;
+        let app_log = serde_json::from_reader(reader).map_err(std::io::Error::other)?;
         state = AppState::from_app_log(app_log);
     } else {
         let Some(n) = args.n else {
@@ -775,12 +775,12 @@ fn main() -> io::Result<()> {
 
         if previous_message != message {
             stdout
-                .queue(cursor::MoveTo(0, layout.height as u16))?
+                .queue(cursor::MoveTo(0, layout.height))?
                 .queue(terminal::Clear(terminal::ClearType::CurrentLine))?
                 .flush()?;
 
             stdout
-                .queue(cursor::MoveTo(0, layout.height as u16))?
+                .queue(cursor::MoveTo(0, layout.height))?
                 .queue(style::Print(message))?;
         }
 
@@ -875,9 +875,7 @@ fn main() -> io::Result<()> {
             //state.message = format!("{:?}", (x, y, side)).into();
         }
 
-        stdout
-            .queue(cursor::MoveTo(0, layout.height as u16))?
-            .flush()?;
+        stdout.queue(cursor::MoveTo(0, layout.height))?.flush()?;
 
         if state.alert > 0 {
             state.alert -= 1;
