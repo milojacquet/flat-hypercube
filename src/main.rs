@@ -179,6 +179,7 @@ struct AppState {
     filter_ind: usize,
     use_live_filter: bool,
     live_filter_string: String,
+    live_filter_pending: Filter,
     live_filter: Filter,
 }
 
@@ -502,7 +503,7 @@ impl AppState {
 
                 let filter_result: Result<Filter, _> = self.live_filter_string.parse();
                 if let Ok(filter) = &filter_result {
-                    self.live_filter = filter.clone();
+                    self.live_filter_pending = filter.clone();
                 }
 
                 if c == '\n' {
@@ -512,6 +513,7 @@ impl AppState {
                         self.flush_modes();
                         self.mode = Default::default();
                         self.use_live_filter = true;
+                        self.live_filter = self.live_filter_pending.clone();
                     }
                 }
             }
@@ -642,6 +644,7 @@ fn main() -> io::Result<()> {
         use_live_filter: false,
         live_filter_string: "".to_string(),
         live_filter: Default::default(),
+        live_filter_pending: Default::default(),
     };
     let layout = Layout::make_layout(args.n, args.d, args.compact).move_right(1);
     //println!("{:?}", layout.keybind_hints);
@@ -705,7 +708,9 @@ fn main() -> io::Result<()> {
             // in this loop we are more efficient by not flushing the buffer.
             let ch;
             let color;
-            let filter = if matches!(state.mode, AppMode::LiveFilter) || state.use_live_filter {
+            let filter = if matches!(state.mode, AppMode::LiveFilter) {
+                &state.live_filter_pending
+            } else if state.use_live_filter {
                 &state.live_filter
             } else if let Some(filter) = state.filters.get(state.filter_ind) {
                 filter
