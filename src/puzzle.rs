@@ -1,4 +1,6 @@
 use itertools::Itertools;
+use rand::prelude::*;
+use rand::rngs::ThreadRng;
 use std::collections::HashMap;
 
 #[derive(Clone)]
@@ -210,5 +212,20 @@ impl Puzzle {
 
     pub fn stickers(&self, piece: &[i16]) -> Vec<i16> {
         self.piece_body_stickers(&self.piece_body(piece))
+    }
+
+    pub fn scramble(&mut self, rng: &mut ThreadRng) {
+        for _ in 0..5000 {
+            let mut axes: Vec<i16> = (0..self.d as i16).collect();
+            axes.shuffle(rng);
+            let layer = self.n - 1 - 2 * rng.gen_range(0..self.n);
+            self.turn(Turn::Side(SideTurn {
+                side: axes[0],
+                layer_min: layer,
+                layer_max: layer,
+                from: axes[1],
+                to: axes[2],
+            }));
+        }
     }
 }

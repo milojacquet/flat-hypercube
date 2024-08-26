@@ -8,7 +8,7 @@ use crossterm::{
 use filters::Filter;
 use layout::Layout;
 use puzzle::{ax, Puzzle, PuzzleTurn, SideTurn, Turn};
-use rand::prelude::*;
+use rand::rngs::ThreadRng;
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::thread::sleep;
@@ -184,6 +184,29 @@ struct AppState {
 }
 
 impl AppState {
+    fn new(n: i16, d: u16) -> Self {
+        Self {
+            puzzle: Puzzle::make_solved(n, d),
+            mode: Default::default(),
+            current_keys: "".to_string(),
+            current_turn: Default::default(),
+            alert: Default::default(),
+            damage_counter: Default::default(),
+            rng: rand::thread_rng(),
+            keybind_set: KeybindSet::ThreeKey,
+            keybind_axial: KeybindAxial::Axial,
+            message: Default::default(),
+            undo_history: Default::default(),
+            redo_history: Default::default(),
+            filters: vec![],
+            filter_ind: 0,
+            use_live_filter: false,
+            live_filter_string: "".to_string(),
+            live_filter: Default::default(),
+            live_filter_pending: Default::default(),
+        }
+    }
+
     fn flush_modes(&mut self) {
         self.current_keys = "".to_string();
         self.current_turn = Default::default();
@@ -208,19 +231,8 @@ impl AppState {
             self.flush_modes();
             if ch == SCRAMBLE_KEY && self.puzzle.d >= 3 {
                 self.puzzle = Puzzle::make_solved(self.puzzle.n, self.puzzle.d);
-                for _ in 0..5000 {
-                    let mut axes: Vec<i16> = (0..self.puzzle.d as i16).collect();
-                    axes.shuffle(&mut self.rng);
-                    let layer = self.puzzle.n - 1 - 2 * self.rng.gen_range(0..self.puzzle.n);
-                    self.puzzle.turn(Turn::Side(SideTurn {
-                        side: axes[0],
-                        layer_min: layer,
-                        layer_max: layer,
-                        from: axes[1],
-                        to: axes[2],
-                    }));
-                    self.message = Some("scrambled with 5000 turns".to_string());
-                }
+                self.puzzle.scramble(&mut self.rng);
+                self.message = Some("scrambled with 5000 turns".to_string());
                 self.undo_history = vec![];
                 self.redo_history = vec![];
             } else if ch == RESET_KEY {
@@ -604,7 +616,7 @@ struct Args {
     #[arg(short, long)]
     compact: bool,
 
-    /// File that contains the filters for the solve
+    /// File that contains the filters for the solve, one per line
     #[arg(short, long)]
     filters: Option<PathBuf>,
 }
@@ -625,33 +637,13 @@ fn main() -> io::Result<()> {
         panic!("side should be greater than 0");
     }
 
-    let filters = if let Some(path) = args.filters {
-        let filters_str = std::fs::read_to_string(path).expect("Invalid filter file");
-        filters_str.lines().map(|l| l.parse().unwrap()).collect()
-    } else {
-        vec![]
-    };
+    let mut state = AppState::new(args.n, args.d);
 
-    let mut state = AppState {
-        puzzle: Puzzle::make_solved(args.n, args.d),
-        mode: Default::default(),
-        current_keys: "".to_string(),
-        current_turn: Default::default(),
-        alert: Default::default(),
-        damage_counter: Default::default(),
-        rng: rand::thread_rng(),
-        keybind_set: KeybindSet::ThreeKey,
-        keybind_axial: KeybindAxial::Axial,
-        message: Default::default(),
-        undo_history: Default::default(),
-        redo_history: Default::default(),
-        filters,
-        filter_ind: 0,
-        use_live_filter: false,
-        live_filter_string: "".to_string(),
-        live_filter: Default::default(),
-        live_filter_pending: Default::default(),
-    };
+    if let Some(path) = args.filters {
+        let filters_str = std::fs::read_to_string(path).expect("Invalid filter file");
+        state.filters = filters_str.lines().map(|l| l.parse().unwrap()).collect();
+    }
+
     let layout = Layout::make_layout(args.n, args.d, args.compact).move_right(1);
     //println!("{:?}", layout.keybind_hints);
     //return Ok(());
