@@ -38,7 +38,7 @@ In three dimensions, just pressing a side selector key rotates that side counter
 
 ## Saving and loading
 
-Not yet
+Save the current session by using <kbd>Shift</kbd>+<kbd>S</kbd>. A session can be loaded by passing it in with `--log`.
 
 ## Piece filters
 

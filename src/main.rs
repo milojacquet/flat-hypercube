@@ -9,6 +9,10 @@ use filters::Filter;
 use layout::Layout;
 use puzzle::{ax, Puzzle, PuzzleTurn, SideTurn, Turn};
 use rand::rngs::ThreadRng;
+use serde::{Deserialize, Serialize};
+use std::fs::File;
+use std::io::BufReader;
+use std::io::BufWriter;
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::thread::sleep;
@@ -48,6 +52,7 @@ const NEXT_FILTER_KEY: char = 'K';
 const PREV_FILTER_KEY: char = 'J';
 const LIVE_FILTER_MODE_KEY: char = 'F';
 const RESET_MODE_KEY: char = ESCAPE_CODE;
+const SAVE_KEY: char = 'S';
 const MAX_DIM: u16 = 10;
 const MAX_LAYERS: i16 = 19;
 
@@ -164,6 +169,7 @@ enum AppMode {
 
 struct AppState {
     puzzle: Puzzle,
+    scramble: Puzzle,
     mode: AppMode,
     current_keys: String,
     current_turn: TurnBuild,
@@ -181,12 +187,20 @@ struct AppState {
     live_filter_string: String,
     live_filter_pending: Filter,
     live_filter: Filter,
+    filename: PathBuf,
+}
+
+#[derive(Serialize, Deserialize)]
+struct AppLog {
+    scramble: Puzzle,
+    moves: Vec<Turn>,
 }
 
 impl AppState {
     fn new(n: i16, d: u16) -> Self {
         Self {
             puzzle: Puzzle::make_solved(n, d),
+            scramble: Puzzle::make_solved(n, d),
             mode: Default::default(),
             current_keys: "".to_string(),
             current_turn: Default::default(),
@@ -204,7 +218,49 @@ impl AppState {
             live_filter_string: "".to_string(),
             live_filter: Default::default(),
             live_filter_pending: Default::default(),
+            filename: Self::new_filename(),
         }
+    }
+
+    fn to_app_log(&self) -> AppLog {
+        AppLog {
+            scramble: self.scramble.clone(),
+            moves: self.undo_history.clone(),
+        }
+    }
+
+    fn from_app_log(app_log: AppLog) -> Self {
+        let mut state = AppState::new(app_log.scramble.n, app_log.scramble.d);
+        state.scramble = app_log.scramble.clone();
+        state.puzzle = app_log.scramble;
+        state.undo_history = app_log.moves.clone();
+        for mov in app_log.moves {
+            state.puzzle.turn(mov);
+        }
+        state
+    }
+
+    fn new_filename() -> PathBuf {
+        use chrono::prelude::*;
+
+        let now: DateTime<Local> = std::time::SystemTime::now().into();
+        PathBuf::from(format!(
+            "logs/{}.log",
+            now.naive_local().format("%Y-%m-%d_%H-%M-%S")
+        ))
+    }
+
+    fn save(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let app_log = self.to_app_log();
+
+        if let Some(parent) = self.filename.parent() {
+            std::fs::create_dir_all(parent)?
+        };
+        let file = File::create(self.filename.clone())?;
+        let mut writer = BufWriter::new(file);
+        serde_json::to_writer(&mut writer, &app_log)?;
+        writer.flush()?;
+        Ok(())
     }
 
     fn flush_modes(&mut self) {
@@ -233,11 +289,13 @@ impl AppState {
                 self.puzzle = Puzzle::make_solved(self.puzzle.n, self.puzzle.d);
                 self.puzzle.scramble(&mut self.rng);
                 self.message = Some("scrambled with 5000 turns".to_string());
+                self.scramble = self.puzzle.clone();
                 self.undo_history = vec![];
                 self.redo_history = vec![];
             } else if ch == RESET_KEY {
                 self.puzzle = Puzzle::make_solved(self.puzzle.n, self.puzzle.d);
                 self.message = Some("puzzle reset".to_string());
+                self.scramble = self.puzzle.clone();
                 self.undo_history = vec![];
                 self.redo_history = vec![];
             }
@@ -248,6 +306,12 @@ impl AppState {
             self.message = None;
         } else if c == LIVE_FILTER_MODE_KEY && !matches!(self.mode, AppMode::LiveFilter) {
             self.mode = AppMode::LiveFilter;
+        } else if c == SAVE_KEY {
+            match self.save() {
+                Ok(()) => self.message = Some(format!("saved to {}", self.filename.display())),
+                //Err(err) => self.message = Some(format!("could not save: {}", err)),
+                Err(_err) => self.message = Some("could not save".to_string()),
+            }
         } else {
             match self.mode {
                 AppMode::Turn => {
@@ -608,9 +672,9 @@ impl AppState {
 #[command(version, about, long_about = None)]
 struct Args {
     /// Number of layers of the puzzle
-    n: i16,
+    n: Option<i16>,
     /// Dimension of the puzzle
-    d: u16,
+    d: Option<u16>,
 
     /// Display in compact mode
     #[arg(short, long)]
@@ -619,32 +683,50 @@ struct Args {
     /// File that contains the filters for the solve, one per line
     #[arg(short, long)]
     filters: Option<PathBuf>,
+
+    /// Log file to open
+    #[arg(short, long)]
+    log: Option<PathBuf>,
 }
 
 fn main() -> io::Result<()> {
     let args = Args::parse();
+    let mut state;
+    if let Some(log_file) = args.log {
+        let file = File::open(log_file)?;
+        let reader = BufReader::new(file);
+        let app_log = serde_json::from_reader(reader).map_err(|e| std::io::Error::other(e))?;
+        state = AppState::from_app_log(app_log);
+    } else {
+        let Some(n) = args.n else {
+            panic!("n must be specified")
+        };
+        let Some(d) = args.d else {
+            panic!("d must be specified")
+        };
 
-    if args.d > MAX_DIM {
-        panic!("dimension should be less than or equal to {MAX_DIM}");
-    }
-    if args.d < 1 {
-        panic!("dimension should be greater than 0");
-    }
-    if args.n > MAX_LAYERS {
-        panic!("side should be less than or equal to {MAX_LAYERS}");
-    }
-    if args.d < 1 {
-        panic!("side should be greater than 0");
-    }
+        if d > MAX_DIM {
+            panic!("dimension should be less than or equal to {MAX_DIM}");
+        }
+        if d < 1 {
+            panic!("dimension should be greater than 0");
+        }
+        if n > MAX_LAYERS {
+            panic!("side should be less than or equal to {MAX_LAYERS}");
+        }
+        if d < 1 {
+            panic!("side should be greater than 0");
+        }
 
-    let mut state = AppState::new(args.n, args.d);
+        state = AppState::new(n, d);
+    }
 
     if let Some(path) = args.filters {
         let filters_str = std::fs::read_to_string(path).expect("Invalid filter file");
         state.filters = filters_str.lines().map(|l| l.parse().unwrap()).collect();
     }
 
-    let layout = Layout::make_layout(args.n, args.d, args.compact).move_right(1);
+    let layout = Layout::make_layout(state.puzzle.n, state.puzzle.d, args.compact).move_right(1);
     //println!("{:?}", layout.keybind_hints);
     //return Ok(());
 
@@ -718,7 +800,7 @@ fn main() -> io::Result<()> {
 
             let in_filter = filter.matches_stickers(&state.puzzle.stickers(pos));
 
-            if pos.iter().any(|x| x.abs() == args.n) {
+            if pos.iter().any(|x| x.abs() == state.puzzle.n) {
                 let side = state.puzzle.stickers[pos];
                 ch = if side >= 0 {
                     POS_NAMES[side as usize]

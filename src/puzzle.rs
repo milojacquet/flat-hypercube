@@ -1,9 +1,10 @@
 use itertools::Itertools;
 use rand::prelude::*;
 use rand::rngs::ThreadRng;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct SideTurn {
     pub side: i16,
     pub layer_min: i16,
@@ -24,7 +25,7 @@ impl SideTurn {
     }
 }
 
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct PuzzleTurn {
     pub from: i16,
     pub to: i16,
@@ -39,7 +40,7 @@ impl PuzzleTurn {
     }
 }
 
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub enum Turn {
     Side(SideTurn),
     Puzzle(PuzzleTurn),
@@ -54,12 +55,41 @@ impl Turn {
     }
 }
 
-#[derive(Debug, Clone)]
+mod serde_map {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::collections::HashMap;
+
+    pub(super) fn serialize<K, V, S>(
+        value: &HashMap<K, V>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+        K: Serialize,
+        V: Serialize,
+    {
+        value.iter().collect::<Vec<_>>().serialize(serializer)
+    }
+
+    pub(super) fn deserialize<'de, K, V, D>(deserializer: D) -> Result<HashMap<K, V>, D::Error>
+    where
+        D: Deserializer<'de>,
+        K: Deserialize<'de> + std::hash::Hash + Eq,
+        V: Deserialize<'de>,
+    {
+        Ok(HashMap::from_iter(
+            <Vec<(K, V)>>::deserialize(deserializer)?.into_iter(),
+        ))
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Puzzle {
     pub n: i16,
     pub d: u16,
     // map from coordinate vector (only contains -n+1, n-1 every other, and ±n)
     // to side (sides related by ! are opposite)
+    #[serde(with = "serde_map")]
     pub stickers: HashMap<Vec<i16>, i16>,
 }
 
