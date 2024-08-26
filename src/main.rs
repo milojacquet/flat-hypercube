@@ -689,7 +689,7 @@ struct Args {
     log: Option<PathBuf>,
 }
 
-fn main() -> io::Result<()> {
+fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     let mut state;
     if let Some(log_file) = args.log {
@@ -699,23 +699,23 @@ fn main() -> io::Result<()> {
         state = AppState::from_app_log(app_log);
     } else {
         let Some(n) = args.n else {
-            panic!("n must be specified")
+            return Err("n must be specified".into());
         };
         let Some(d) = args.d else {
-            panic!("d must be specified")
+            return Err("d must be specified".into());
         };
 
         if d > MAX_DIM {
-            panic!("dimension should be less than or equal to {MAX_DIM}");
+            return Err(format!("dimension should be less than or equal to {MAX_DIM}").into());
         }
         if d < 1 {
-            panic!("dimension should be greater than 0");
+            return Err("dimension should be greater than 0".into());
         }
         if n > MAX_LAYERS {
-            panic!("side should be less than or equal to {MAX_LAYERS}");
+            return Err(format!("side should be less than or equal to {MAX_LAYERS}").into());
         }
         if d < 1 {
-            panic!("side should be greater than 0");
+            return Err("side should be greater than 0".into());
         }
 
         state = AppState::new(n, d);
@@ -891,4 +891,11 @@ fn main() -> io::Result<()> {
 
     terminal::disable_raw_mode()?; // does this help?
     Ok(())
+}
+
+fn main() {
+    let res = main_inner();
+    if let Err(err) = res {
+        println!("{}", err);
+    }
 }
