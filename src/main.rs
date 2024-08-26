@@ -691,6 +691,10 @@ struct Args {
     /// Display in vertical mode. This has no effect if d is even.
     #[arg(long)]
     vertical: bool,
+
+    /// Display using colored boxes.
+    #[arg(long)]
+    boxes: bool,
 }
 
 fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
@@ -807,7 +811,9 @@ fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
 
             if pos.iter().any(|x| x.abs() == state.puzzle.n) {
                 let side = state.puzzle.stickers[pos];
-                ch = if side >= 0 {
+                ch = if args.boxes {
+                    '■'
+                } else if side >= 0 {
                     POS_NAMES[side as usize]
                 } else {
                     NEG_NAMES[(!side) as usize]
