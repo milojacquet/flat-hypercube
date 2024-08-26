@@ -139,7 +139,7 @@ impl Layout {
         lower
     }
 
-    pub fn make_layout(n: i16, d: u16, compact: bool) -> Layout {
+    pub fn make_layout(n: i16, d: u16, compact: bool, vertical: bool) -> Layout {
         let gaps = if compact { GAPS_COMPACT } else { GAPS };
 
         if d == 0 {
@@ -154,13 +154,15 @@ impl Layout {
                 },
             }
         } else {
-            let lower = Self::make_layout(n, ((d as i16) - 1) as u16, compact);
+            let make_horizontal = d % 2 == 1 && !vertical;
+
+            let lower = Self::make_layout(n, ((d as i16) - 1) as u16, compact, false);
             let mut row = vec![];
 
             for i in once(-n).chain((-n + 1..n).step_by(2)).chain(once(n)) {
                 let mut lower = lower.clone().push_all(i).clean(n);
                 if i.abs() == n {
-                    if d % 2 == 1 {
+                    if make_horizontal {
                         lower = lower.squish_horiz();
                     } else {
                         lower = lower.squish_vert();
@@ -183,7 +185,7 @@ impl Layout {
 
                 row.push(lower);
             }
-            if d % 2 == 1 {
+            if make_horizontal {
                 Self::concat_horiz(row, gaps[d as usize])
             } else {
                 row.reverse();

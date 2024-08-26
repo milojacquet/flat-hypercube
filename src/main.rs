@@ -687,6 +687,10 @@ struct Args {
     /// Log file to open
     #[arg(short, long)]
     log: Option<PathBuf>,
+
+    /// Display in vertical mode. This has no effect if d is even.
+    #[arg(long)]
+    vertical: bool,
 }
 
 fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
@@ -726,7 +730,8 @@ fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
         state.filters = filters_str.lines().map(|l| l.parse().unwrap()).collect();
     }
 
-    let layout = Layout::make_layout(state.puzzle.n, state.puzzle.d, args.compact).move_right(1);
+    let layout = Layout::make_layout(state.puzzle.n, state.puzzle.d, args.compact, args.vertical)
+        .move_right(1);
     //println!("{:?}", layout.keybind_hints);
     //return Ok(());
 
