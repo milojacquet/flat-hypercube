@@ -1,4 +1,5 @@
 use clap::Parser;
+use rgb2ansi256::rgb_to_ansi256;
 use crossterm::{
     cursor,
     event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
@@ -23,11 +24,11 @@ mod layout;
 mod puzzle;
 
 const fn hex(hex: u32) -> Color {
-    Color::Rgb {
-        r: ((hex >> 16) & 0xff) as u8,
-        g: ((hex >> 8) & 0xff) as u8,
-        b: ((hex >> 0) & 0xff) as u8,
-    }
+    Color::AnsiValue(rgb_to_ansi256(
+        ((hex >> 16) & 0xff) as u8,
+        ((hex >> 8) & 0xff) as u8,
+        ((hex >> 0) & 0xff) as u8,
+    ))
 }
 
 const POS_NAMES: &[char] = &['R', 'U', 'F', 'O', 'A', 'Γ', 'Θ', 'Ξ', 'Σ', 'Ψ'];
