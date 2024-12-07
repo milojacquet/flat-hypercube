@@ -1,5 +1,4 @@
 use clap::Parser;
-use rgb2ansi256::rgb_to_ansi256;
 use crossterm::{
     cursor,
     event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
@@ -10,6 +9,7 @@ use filters::Filter;
 use layout::Layout;
 use puzzle::{ax, Puzzle, PuzzleTurn, SideTurn, Turn};
 use rand::rngs::ThreadRng;
+use rgb2ansi256::rgb_to_ansi256;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::BufReader;
@@ -65,7 +65,7 @@ const POS_COLORS: &[Color] = &[
     hex(0x0aaa85),
     hex(0x774811),
     hex(0xf49fef),
-    hex(0xb29867),
+    hex(0xf9c254),
     hex(0x9cf542),
     hex(0x078517),
 ];
