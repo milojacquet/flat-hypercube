@@ -903,9 +903,7 @@ fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
         //state.puzzle.turn(0, 2, 2, 1); // R
     }
 
-    stdout.execute(terminal::Clear(terminal::ClearType::All))?;
     stdout.execute(cursor::Show)?;
-    stdout.execute(terminal::LeaveAlternateScreen)?;
     terminal::disable_raw_mode()?; // does this help?
     Ok(())
 }
