@@ -741,7 +741,7 @@ fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut stdout = io::stdout();
     terminal::enable_raw_mode()?;
-    stdout.execute(terminal::Clear(terminal::ClearType::All))?;
+    stdout.execute(terminal::EnterAlternateScreen)?;
     stdout.execute(cursor::Hide)?;
 
     loop {
@@ -749,14 +749,13 @@ fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
 
         let previous_message = state.get_message();
         if event::poll(Duration::from_millis(0))? {
-            if let Event::Key(KeyEvent {
-                code,
-                kind: KeyEventKind::Press,
-                modifiers,
-                ..
-            }) = event::read()?
-            {
-                match code {
+            match event::read()? {
+                Event::Key(KeyEvent {
+                    code,
+                    kind: KeyEventKind::Press,
+                    modifiers,
+                    ..
+                }) => match code {
                     KeyCode::Char('c') if modifiers.contains(KeyModifiers::CONTROL) => {
                         break;
                     }
@@ -776,7 +775,11 @@ fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                         state.process_key(BACKSPACE_CODE, modifiers);
                     }
                     _ => (),
+                },
+                Event::Resize(_, _) => {
+                    stdout.execute(terminal::Clear(terminal::ClearType::All))?;
                 }
+                _ => (),
             }
         }
 
@@ -900,6 +903,7 @@ fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
         //state.puzzle.turn(0, 2, 2, 1); // R
     }
 
+    stdout.execute(cursor::Show)?;
     terminal::disable_raw_mode()?; // does this help?
     Ok(())
 }
