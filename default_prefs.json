@@ -1,0 +1,270 @@
+{
+    "axes":
+    [
+        {
+            "pos":
+            {
+                "name": "R",
+                "color": "ff0000",
+                "keys":
+                {
+                    "select": "f",
+                    "side": "l"
+                }
+            },
+            "neg":
+            {
+                "name": "L",
+                "color": "ff8000",
+                "keys":
+                {
+                    "select": "s",
+                    "side": "j"
+                }
+            },
+            "axis_key": "k"
+        },
+        {
+            "pos":
+            {
+                "name": "U",
+                "color": "ffffff",
+                "keys":
+                {
+                    "select": "e",
+                    "side": "i"
+                }
+            },
+            "neg":
+            {
+                "name": "D",
+                "color": "ffff00",
+                "keys":
+                {
+                    "select": "d",
+                    "side": "k"
+                }
+            },
+            "axis_key": "j"
+        },
+        {
+            "pos":
+            {
+                "name": "F",
+                "color": "00ff00",
+                "keys":
+                {
+                    "select": "r",
+                    "side": "o"
+                }
+            },
+            "neg":
+            {
+                "name": "B",
+                "color": "0080ff",
+                "keys":
+                {
+                    "select": "w",
+                    "side": "u"
+                }
+            },
+            "axis_key": "l"
+        },
+        {
+            "pos":
+            {
+                "name": "O",
+                "color": "ff00ff",
+                "keys":
+                {
+                    "select": "t",
+                    "side": "p"
+                }
+            },
+            "neg":
+            {
+                "name": "I",
+                "color": "8f10ea",
+                "keys":
+                {
+                    "select": "g",
+                    "side": ";"
+                }
+            },
+            "axis_key": "i"
+        },
+        {
+            "pos":
+            {
+                "name": "A",
+                "color": "0aaa85",
+                "keys":
+                {
+                    "select": "v",
+                    "side": "."
+                }
+            },
+            "neg":
+            {
+                "name": "P",
+                "color": "7daa0a",
+                "keys":
+                {
+                    "select": "c",
+                    "side": ","
+                }
+            },
+            "axis_key": "u"
+        },
+        {
+            "pos":
+            {
+                "name": "Γ",
+                "color": "774811",
+                "keys":
+                {
+                    "select": "y",
+                    "side": "["
+                }
+            },
+            "neg":
+            {
+                "name": "Δ",
+                "color": "6d4564",
+                "keys":
+                {
+                    "select": "h",
+                    "side": "'"
+                }
+            },
+            "axis_key": "o"
+        },
+        {
+            "pos":
+            {
+                "name": "Θ",
+                "color": "f49fef",
+                "keys":
+                {
+                    "select": "n",
+                    "side": "∅"
+                }
+            },
+            "neg":
+            {
+                "name": "Λ",
+                "color": "d4a94e",
+                "keys":
+                {
+                    "select": "b",
+                    "side": "∅"
+                }
+            },
+            "axis_key": "p"
+        },
+        {
+            "pos":
+            {
+                "name": "Ξ",
+                "color": "f9c254",
+                "keys":
+                {
+                    "select": "q",
+                    "side": "∅"
+                }
+            },
+            "neg":
+            {
+                "name": "Π",
+                "color": "b27967",
+                "keys":
+                {
+                    "select": "a",
+                    "side": "∅"
+                }
+            },
+            "axis_key": ";"
+        },
+        {
+            "pos":
+            {
+                "name": "Σ",
+                "color": "9cf542",
+                "keys":
+                {
+                    "select": ",",
+                    "side": "∅"
+                }
+            },
+            "neg":
+            {
+                "name": "Φ",
+                "color": "42d4f5",
+                "keys":
+                {
+                    "select": "m",
+                    "side": "∅"
+                }
+            },
+            "axis_key": "["
+        },
+        {
+            "pos":
+            {
+                "name": "Ψ",
+                "color": "078517",
+                "keys":
+                {
+                    "select": "/",
+                    "side": "∅"
+                }
+            },
+            "neg":
+            {
+                "name": "Ω",
+                "color": "2f2fbd",
+                "keys":
+                {
+                    "select": ".",
+                    "side": "∅"
+                }
+            },
+            "axis_key": "'"
+        }
+    ],
+    "global_keys":
+    {
+        "layers":
+        [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9"
+        ],
+        "rotate": "x",
+        "scramble": "=",
+        "reset": "-",
+        "keybind_mode": "\\",
+        "axis_mode": "|",
+        "undo": "z",
+        "redo": "Z",
+        "next_filter": "K",
+        "prev_filter": "J",
+        "live_filter_mode": "F",
+        "reset_mode": "⎋",
+        "save": "S"
+    },
+    "global_colors":
+    {
+        "piece": "808080",
+        "filtered": "505050",
+        "alert": "d86c6c"
+    },
+    "damage_repeat": 5,
+    "alert_frames": 4
+}

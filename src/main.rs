@@ -1,15 +1,17 @@
+use crate::prefs::BACKSPACE_CODE;
+use crate::prefs::ESCAPE_CODE;
 use clap::Parser;
 use crossterm::{
     cursor,
     event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
-    style::{self, Color, Stylize},
+    style::{self, Stylize},
     terminal, ExecutableCommand, QueueableCommand,
 };
 use filters::Filter;
 use layout::Layout;
+use prefs::Prefs;
 use puzzle::{ax, Puzzle, PuzzleTurn, SideTurn, Turn};
 use rand::rngs::ThreadRng;
-use rgb2ansi256::rgb_to_ansi256;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::BufReader;
@@ -21,71 +23,10 @@ use std::time::{Duration, Instant};
 
 mod filters;
 mod layout;
+mod prefs;
 mod puzzle;
 
-const fn hex(hex: u32) -> Color {
-    Color::AnsiValue(rgb_to_ansi256(
-        ((hex >> 16) & 0xff) as u8,
-        ((hex >> 8) & 0xff) as u8,
-        ((hex >> 0) & 0xff) as u8,
-    ))
-}
-
-const POS_NAMES: &[char] = &['R', 'U', 'F', 'O', 'A', 'Γ', 'Θ', 'Ξ', 'Σ', 'Ψ'];
-const NEG_NAMES: &[char] = &['L', 'D', 'B', 'I', 'P', 'Δ', 'Λ', 'Π', 'Φ', 'Ω'];
-const POS_KEYS: &[char] = &['f', 'e', 'r', 't', 'v', 'y', 'n', 'q', ',', '/'];
-const NEG_KEYS: &[char] = &['s', 'd', 'w', 'g', 'c', 'h', 'b', 'a', 'm', '.'];
-const POS_KEYS_RIGHT: &[char] = &['l', 'i', 'j', '.', 'p', '['];
-const NEG_KEYS_RIGHT: &[char] = &['u', ',', 'o', 'k', 'l', ';'];
-const AXIS_KEYS: &[char] = &['k', 'j', 'l', 'i', 'u', 'o', 'p', ';', '[', '\''];
-const LAYER_KEYS: &[char] = &['1', '2', '3', '4', '5', '6', '7', '8', '9'];
-const ESCAPE_CODE: char = '⎋';
-const BACKSPACE_CODE: char = '⌫';
-const ROT_KEY: char = 'x';
-const SCRAMBLE_KEY: char = '=';
-const RESET_KEY: char = '-';
-const DAMAGE_REPEAT: u8 = 5;
-const KEYBIND_KEY: char = '\\';
-const KEYBIND_AXIAL_KEY: char = '|';
-const UNDO_KEY: char = 'z';
-const REDO_KEY: char = 'Z';
-const NEXT_FILTER_KEY: char = 'K';
-const PREV_FILTER_KEY: char = 'J';
-const LIVE_FILTER_MODE_KEY: char = 'F';
-const RESET_MODE_KEY: char = ESCAPE_CODE;
-const SAVE_KEY: char = 'S';
-const MAX_DIM: u16 = 10;
-const MAX_LAYERS: i16 = 19;
-
-const POS_COLORS: &[Color] = &[
-    hex(0xff0000),
-    hex(0xffffff),
-    hex(0x00ff00),
-    hex(0xff00ff),
-    hex(0x0aaa85),
-    hex(0x774811),
-    hex(0xf49fef),
-    hex(0xf9c254),
-    hex(0x9cf542),
-    hex(0x078517),
-];
-const NEG_COLORS: &[Color] = &[
-    hex(0xff8000),
-    hex(0xffff00),
-    hex(0x0080ff),
-    hex(0x8f10ea),
-    hex(0x7daa0a),
-    hex(0x6d4564),
-    hex(0xd4a94e),
-    hex(0xb27967),
-    hex(0x42d4f5),
-    hex(0x2f2fbd),
-];
-const PIECE_COLOR: Color = hex(0x808080);
-const FILTERED_COLOR: Color = hex(0x505050);
-const ALERT_COLOR: Color = hex(0xd86c6c);
 const FRAME_LENGTH: Duration = Duration::from_millis(1000 / 30);
-const ALERT_FRAMES: u8 = 4;
 
 #[derive(PartialEq)]
 enum TurnLayer {
@@ -189,6 +130,7 @@ struct AppState {
     live_filter_pending: Filter,
     live_filter: Filter,
     filename: PathBuf,
+    prefs: Prefs,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -198,7 +140,7 @@ struct AppLog {
 }
 
 impl AppState {
-    fn new(n: i16, d: u16) -> Self {
+    fn new(n: i16, d: u16, prefs: Prefs) -> Self {
         Self {
             puzzle: Puzzle::make_solved(n, d),
             scramble: Puzzle::make_solved(n, d),
@@ -220,6 +162,7 @@ impl AppState {
             live_filter: Default::default(),
             live_filter_pending: Default::default(),
             filename: Self::new_filename(),
+            prefs,
         }
     }
 
@@ -230,8 +173,8 @@ impl AppState {
         }
     }
 
-    fn from_app_log(app_log: AppLog) -> Self {
-        let mut state = AppState::new(app_log.scramble.n, app_log.scramble.d);
+    fn from_app_log(app_log: AppLog, prefs: Prefs) -> Self {
+        let mut state = AppState::new(app_log.scramble.n, app_log.scramble.d, prefs);
         state.scramble = app_log.scramble.clone();
         state.puzzle = app_log.scramble;
         state.undo_history = app_log.moves.clone();
@@ -272,7 +215,7 @@ impl AppState {
 
     fn process_key(&mut self, c: char, _mods: KeyModifiers) {
         self.message = None;
-        if c == SCRAMBLE_KEY || c == RESET_KEY {
+        if c == self.prefs.global_keys.scramble || c == self.prefs.global_keys.reset {
             match self.damage_counter {
                 None => self.damage_counter = Some((c, 1)),
                 Some((ch, i)) if ch == c => {
@@ -284,30 +227,34 @@ impl AppState {
             self.damage_counter = None;
         }
 
-        if let Some((ch, DAMAGE_REPEAT)) = self.damage_counter {
-            self.flush_modes();
-            if ch == SCRAMBLE_KEY && self.puzzle.d >= 3 {
-                self.puzzle = Puzzle::make_solved(self.puzzle.n, self.puzzle.d);
-                self.puzzle.scramble(&mut self.rng);
-                self.message = Some("scrambled with 5000 turns".to_string());
-                self.scramble = self.puzzle.clone();
-                self.undo_history = vec![];
-                self.redo_history = vec![];
-            } else if ch == RESET_KEY {
-                self.puzzle = Puzzle::make_solved(self.puzzle.n, self.puzzle.d);
-                self.message = Some("puzzle reset".to_string());
-                self.scramble = self.puzzle.clone();
-                self.undo_history = vec![];
-                self.redo_history = vec![];
+        if let Some((ch, dr)) = self.damage_counter {
+            if dr == self.prefs.damage_repeat {
+                self.flush_modes();
+                if ch == self.prefs.global_keys.scramble && self.puzzle.d >= 3 {
+                    self.puzzle = Puzzle::make_solved(self.puzzle.n, self.puzzle.d);
+                    self.puzzle.scramble(&mut self.rng);
+                    self.message = Some("scrambled with 5000 turns".to_string());
+                    self.scramble = self.puzzle.clone();
+                    self.undo_history = vec![];
+                    self.redo_history = vec![];
+                } else if ch == self.prefs.global_keys.reset {
+                    self.puzzle = Puzzle::make_solved(self.puzzle.n, self.puzzle.d);
+                    self.message = Some("puzzle reset".to_string());
+                    self.scramble = self.puzzle.clone();
+                    self.undo_history = vec![];
+                    self.redo_history = vec![];
+                }
+                self.damage_counter = None;
             }
-            self.damage_counter = None;
-        } else if c == RESET_MODE_KEY {
+        } else if c == self.prefs.global_keys.reset_mode {
             self.mode = Default::default();
             self.flush_modes();
             self.message = None;
-        } else if c == LIVE_FILTER_MODE_KEY && !matches!(self.mode, AppMode::LiveFilter) {
+        } else if c == self.prefs.global_keys.live_filter_mode
+            && !matches!(self.mode, AppMode::LiveFilter)
+        {
             self.mode = AppMode::LiveFilter;
-        } else if c == SAVE_KEY {
+        } else if c == self.prefs.global_keys.save {
             match self.save() {
                 Ok(()) => self.message = Some(format!("saved to {}", self.filename.display())),
                 //Err(err) => self.message = Some(format!("could not save: {}", err)),
@@ -318,11 +265,11 @@ impl AppState {
                 AppMode::Turn => {
                     let mut just_pressed_side = false;
 
-                    if c == KEYBIND_KEY {
+                    if c == self.prefs.global_keys.keybind_mode {
                         self.flush_modes();
                         self.keybind_set = self.keybind_set.next(self.puzzle.n);
                         self.message = Some(format!("set keybinds to {}", self.keybind_set.name()))
-                    } else if c == KEYBIND_AXIAL_KEY {
+                    } else if c == self.prefs.global_keys.axis_mode {
                         if self.puzzle.d > 6 {
                             self.message = Some("not enough room for side keybinds".to_string());
                         } else {
@@ -331,7 +278,7 @@ impl AppState {
                             self.message =
                                 Some(format!("set axis mode to {}", self.keybind_axial.name()))
                         }
-                    } else if c == UNDO_KEY {
+                    } else if c == self.prefs.global_keys.undo {
                         self.flush_modes();
                         let undid = self.undo_history.pop();
                         match undid {
@@ -343,7 +290,7 @@ impl AppState {
                                 self.redo_history.push(undid)
                             }
                         }
-                    } else if c == REDO_KEY {
+                    } else if c == self.prefs.global_keys.redo {
                         self.flush_modes();
                         let redid = self.redo_history.pop();
                         match redid {
@@ -355,7 +302,7 @@ impl AppState {
                                 self.undo_history.push(redid)
                             }
                         }
-                    } else if c == NEXT_FILTER_KEY {
+                    } else if c == self.prefs.global_keys.next_filter {
                         if self.filters.is_empty() {
                             self.message = Some("no filters loaded".to_string());
                         } else {
@@ -364,7 +311,7 @@ impl AppState {
                             self.use_live_filter = false;
                             self.message = Some("next filter".to_string());
                         }
-                    } else if c == PREV_FILTER_KEY {
+                    } else if c == self.prefs.global_keys.prev_filter {
                         if self.filters.is_empty() {
                             self.message = Some("no filters loaded".to_string());
                         } else {
@@ -373,14 +320,21 @@ impl AppState {
                             self.use_live_filter = false;
                             self.message = Some("previous filter".to_string());
                         }
-                    } else if let Some(s) = LAYER_KEYS.iter().position(|ch| ch == &c) {
+                    } else if let Some(s) =
+                        self.prefs.global_keys.layers.iter().position(|ch| ch == &c)
+                    {
                         if s as i16 >= self.puzzle.n {
                             return;
                         }
                         self.flush_modes();
                         self.current_keys.push(c);
                         self.current_turn.layer = Some(TurnLayer::Layer(s as i16));
-                    } else if let Some(s) = POS_KEYS.iter().position(|ch| ch == &c) {
+                    } else if let Some(s) = self
+                        .prefs
+                        .axes
+                        .iter()
+                        .position(|ax| ax.pos.keys.select == c)
+                    {
                         if s as u16 >= self.puzzle.d {
                             return;
                         }
@@ -390,7 +344,12 @@ impl AppState {
                         self.current_keys.push(c);
                         self.current_turn.side = Some(s as i16);
                         just_pressed_side = true;
-                    } else if let Some(s) = NEG_KEYS.iter().position(|ch| ch == &c) {
+                    } else if let Some(s) = self
+                        .prefs
+                        .axes
+                        .iter()
+                        .position(|ax| ax.neg.keys.select == c)
+                    {
                         if s as u16 >= self.puzzle.d {
                             return;
                         }
@@ -400,7 +359,7 @@ impl AppState {
                         self.current_keys.push(c);
                         self.current_turn.side = Some(!(s as i16));
                         just_pressed_side = true;
-                    } else if c == ROT_KEY {
+                    } else if c == self.prefs.global_keys.rotate {
                         if self.keybind_set == KeybindSet::ThreeKey {
                             self.flush_modes();
                             just_pressed_side = true;
@@ -436,7 +395,7 @@ impl AppState {
                                         let turn_out = self.perform_turn(side, from, s);
 
                                         if turn_out.is_none() {
-                                            self.alert = ALERT_FRAMES * 4 - 1;
+                                            self.alert = self.prefs.alert_frames * 4 - 1;
                                             self.current_keys = self.current_keys
                                                 [..self.current_keys.len() - 2]
                                                 .to_string();
@@ -450,7 +409,9 @@ impl AppState {
                         }
                         KeybindSet::FixedKey if self.puzzle.d == 3 => {
                             let flip;
-                            if let Some(s) = POS_KEYS_RIGHT.iter().position(|ch| ch == &c) {
+                            if let Some(s) =
+                                self.prefs.axes.iter().position(|ax| ax.pos.keys.side == c)
+                            {
                                 if ax(s as i16) as u16 >= self.puzzle.d {
                                     return;
                                 }
@@ -463,7 +424,9 @@ impl AppState {
                                 self.current_turn.side = Some(s as i16);
                                 flip = true;
                                 just_pressed_side = true;
-                            } else if let Some(s) = NEG_KEYS_RIGHT.iter().position(|ch| ch == &c) {
+                            } else if let Some(s) =
+                                self.prefs.axes.iter().position(|ax| ax.neg.keys.side == c)
+                            {
                                 if ax(s as i16) as u16 >= self.puzzle.d {
                                     return;
                                 }
@@ -549,7 +512,7 @@ impl AppState {
                                         });
 
                                         if turn_out.is_none() {
-                                            self.alert = ALERT_FRAMES * 4 - 1;
+                                            self.alert = self.prefs.alert_frames * 4 - 1;
                                             self.current_keys =
                                                 self.current_keys[..self.current_keys.len()
                                                     - self.current_turn.fixed.len()]
@@ -566,25 +529,41 @@ impl AppState {
                 AppMode::LiveFilter => {
                     if c == '+' || c == '!' {
                         self.live_filter_string.push(c);
-                    } else if let Some(s) = POS_KEYS.iter().position(|ch| ch == &c) {
+                    } else if let Some((s, side)) = self
+                        .prefs
+                        .axes
+                        .iter()
+                        .enumerate()
+                        .find_map(|(s, ax)| (ax.pos.keys.select == c).then_some((s, &ax.pos)))
+                    {
                         if s as u16 >= self.puzzle.d {
                             return;
                         }
-                        self.live_filter_string.push(POS_NAMES[s]);
-                    } else if let Some(s) = NEG_KEYS.iter().position(|ch| ch == &c) {
+                        self.live_filter_string.push(side.name);
+                    } else if let Some((s, side)) = self
+                        .prefs
+                        .axes
+                        .iter()
+                        .enumerate()
+                        .find_map(|(s, ax)| (ax.neg.keys.select == c).then_some((s, &ax.neg)))
+                    {
                         if s as u16 >= self.puzzle.d {
                             return;
                         }
-                        self.live_filter_string.push(NEG_NAMES[s]);
-                    } else if POS_NAMES.iter().any(|ch| ch == &c)
-                        || NEG_NAMES.iter().any(|ch| ch == &c)
+                        self.live_filter_string.push(side.name);
+                    } else if self
+                        .prefs
+                        .axes
+                        .iter()
+                        .any(|ax| ax.pos.name == c || ax.neg.name == c)
                     {
                         self.live_filter_string.push(c);
                     } else if c == BACKSPACE_CODE {
                         self.live_filter_string.pop();
                     }
 
-                    let filter_result: Result<Filter, _> = self.live_filter_string.parse();
+                    let filter_result: Result<Filter, _> =
+                        Filter::parse(&self.live_filter_string, &self.prefs);
                     if let Ok(filter) = &filter_result {
                         self.live_filter_pending = filter.clone();
                     }
@@ -606,11 +585,12 @@ impl AppState {
 
     fn get_axis_key(&self, c: char) -> Option<i16> {
         match self.keybind_axial {
-            KeybindAxial::Axial => AXIS_KEYS.iter().position(|ch| ch == &c),
-            KeybindAxial::Side => POS_KEYS_RIGHT
-                .iter()
-                .position(|ch| ch == &c)
-                .or_else(|| NEG_KEYS_RIGHT.iter().position(|ch| ch == &c).map(|s| !s)),
+            KeybindAxial::Axial => self.prefs.axes.iter().position(|ax| ax.axis_key == c),
+            KeybindAxial::Side => self.prefs.axes.iter().enumerate().find_map(|(s, ax)| {
+                (ax.pos.keys.side == c)
+                    .then_some(s)
+                    .or_else(|| (ax.neg.keys.side == c).then_some(!s))
+            }),
         }
         .map(|s| s as i16)
     }
@@ -696,16 +676,29 @@ struct Args {
     /// Display using colored boxes.
     #[arg(long)]
     boxes: bool,
+
+    /// Preferences file
+    #[arg(short, long)]
+    prefs: Option<PathBuf>,
 }
 
 fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
+    let prefs: Prefs = {
+        let path = args
+            .prefs
+            .unwrap_or(PathBuf::from(prefs::DEFAULT_FILE_PATH_STR));
+        let file = File::open(path)?;
+        let reader = BufReader::new(file);
+        serde_json::from_reader(reader)?
+    };
+
     let mut state;
     if let Some(log_file) = args.log {
         let file = File::open(log_file)?;
         let reader = BufReader::new(file);
         let app_log = serde_json::from_reader(reader).map_err(std::io::Error::other)?;
-        state = AppState::from_app_log(app_log);
+        state = AppState::from_app_log(app_log, prefs);
     } else {
         let Some(n) = args.n else {
             return Err("n must be specified".into());
@@ -714,25 +707,36 @@ fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
             return Err("d must be specified".into());
         };
 
-        if d > MAX_DIM {
-            return Err(format!("dimension should be less than or equal to {MAX_DIM}").into());
+        if d > prefs.max_dim() {
+            return Err(format!(
+                "dimension should be less than or equal to {}",
+                prefs.max_dim()
+            )
+            .into());
         }
         if d < 1 {
             return Err("dimension should be greater than 0".into());
         }
-        if n > MAX_LAYERS {
-            return Err(format!("side should be less than or equal to {MAX_LAYERS}").into());
+        if n > prefs.max_layers() {
+            return Err(format!(
+                "side should be less than or equal to {}",
+                prefs.max_layers()
+            )
+            .into());
         }
         if d < 1 {
             return Err("side should be greater than 0".into());
         }
 
-        state = AppState::new(n, d);
+        state = AppState::new(n, d, prefs);
     }
 
     if let Some(path) = args.filters {
         let filters_str = std::fs::read_to_string(path).expect("Invalid filter file");
-        state.filters = filters_str.lines().map(|l| l.parse().unwrap()).collect();
+        state.filters = filters_str
+            .lines()
+            .map(|l| Filter::parse(&l, &state.prefs).unwrap())
+            .collect();
     }
 
     let layout = Layout::make_layout(state.puzzle.n, state.puzzle.d, args.compact, args.vertical)
@@ -818,30 +822,30 @@ fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                 ch = if args.boxes {
                     '■'
                 } else if side >= 0 {
-                    POS_NAMES[side as usize]
+                    state.prefs.axes[side as usize].pos.name
                 } else {
-                    NEG_NAMES[(!side) as usize]
+                    state.prefs.axes[(!side) as usize].neg.name
                 };
                 color = if !in_filter {
-                    FILTERED_COLOR
+                    state.prefs.global_colors.filtered
                 } else if side >= 0 {
-                    POS_COLORS[side as usize]
+                    state.prefs.axes[side as usize].pos.color
                 } else {
-                    NEG_COLORS[(!side) as usize]
+                    state.prefs.axes[(!side) as usize].neg.color
                 };
                 stdout
                     .queue(cursor::MoveTo(*x as u16, *y as u16))?
                     .queue(style::PrintStyledContent(ch.with(color)))?;
             } else if !matches!(layout.keybind_hints.get(&(*x, *y)), Some(Some(_))) {
-                if state.alert % (ALERT_FRAMES * 2) >= ALERT_FRAMES {
+                if state.alert % (state.prefs.alert_frames * 2) >= state.prefs.alert_frames {
                     ch = '+';
-                    color = ALERT_COLOR;
+                    color = state.prefs.global_colors.alert;
                 } else {
                     ch = '·';
                     color = if in_filter {
-                        PIECE_COLOR
+                        state.prefs.global_colors.piece
                     } else {
-                        FILTERED_COLOR
+                        state.prefs.global_colors.filtered
                     };
                 }
                 stdout
@@ -859,29 +863,29 @@ fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                     || (state.keybind_set == KeybindSet::FixedKey && state.puzzle.d == 3)
                 {
                     if *side >= 0 {
-                        POS_KEYS[*side as usize]
+                        state.prefs.axes[*side as usize].pos.keys.select
                     } else {
-                        NEG_KEYS[(!side) as usize]
+                        state.prefs.axes[(!side) as usize].neg.keys.select
                     }
                 } else {
                     match state.keybind_axial {
                         KeybindAxial::Axial => {
                             if *side >= 0 {
-                                AXIS_KEYS[*side as usize]
+                                state.prefs.axes[*side as usize].axis_key
                             } else {
                                 '·'
                             }
                         }
                         KeybindAxial::Side => {
                             if *side >= 0 {
-                                POS_KEYS_RIGHT[*side as usize]
+                                state.prefs.axes[*side as usize].pos.keys.side
                             } else {
-                                NEG_KEYS_RIGHT[(!side) as usize]
+                                state.prefs.axes[(!side) as usize].neg.keys.side
                             }
                         }
                     }
                 };
-                color = PIECE_COLOR;
+                color = state.prefs.global_colors.piece;
 
                 stdout
                     .queue(cursor::MoveTo(*x as u16, *y as u16))?

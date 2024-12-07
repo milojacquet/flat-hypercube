@@ -1,6 +1,4 @@
-use crate::NEG_NAMES;
-use crate::POS_NAMES;
-use std::str::FromStr;
+use crate::Prefs;
 
 #[derive(Debug, Clone)]
 struct FilterSide {
@@ -21,10 +19,8 @@ impl Default for Filter {
     }
 }
 
-impl FromStr for Filter {
-    type Err = String;
-
-    fn from_str(st: &str) -> Result<Self, Self::Err> {
+impl Filter {
+    pub fn parse(st: &str, prefs: &Prefs) -> Result<Self, String> {
         let mut filter = Filter(vec![]);
 
         for tst in st.split('+') {
@@ -50,12 +46,12 @@ impl FromStr for Filter {
                         continue;
                     }
 
-                    if let Some(ind) = POS_NAMES.iter().position(|c| c == &ch) {
+                    if let Some(ind) = prefs.axes.iter().position(|ax| ax.pos.name == ch) {
                         filter_sides.push(FilterSide {
                             have,
                             color: ind as i16,
                         });
-                    } else if let Some(ind) = NEG_NAMES.iter().position(|c| c == &ch) {
+                    } else if let Some(ind) = prefs.axes.iter().position(|ax| ax.neg.name == ch) {
                         filter_sides.push(FilterSide {
                             have,
                             color: !(ind as i16),
