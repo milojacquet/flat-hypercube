@@ -757,6 +757,7 @@ fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
         let frame_begin = Instant::now();
 
         let previous_message = state.get_message();
+        let mut just_resized = false;
         if event::poll(Duration::from_millis(0))? {
             match event::read()? {
                 Event::Key(KeyEvent {
@@ -787,6 +788,7 @@ fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                 },
                 Event::Resize(_, _) => {
                     stdout.execute(terminal::Clear(terminal::ClearType::All))?;
+                    just_resized = true;
                 }
                 _ => (),
             }
@@ -794,7 +796,7 @@ fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
 
         let message = state.get_message();
 
-        if previous_message != message {
+        if previous_message != message || just_resized {
             stdout
                 .queue(cursor::MoveTo(0, layout.height))?
                 .queue(terminal::Clear(terminal::ClearType::CurrentLine))?
