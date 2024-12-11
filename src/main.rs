@@ -558,6 +558,10 @@ impl AppState {
                         .any(|ax| ax.pos.name == c || ax.neg.name == c)
                     {
                         self.live_filter_string.push(c);
+                    } else if let Some(ind) = filters::DIGITS.chars().position(|ch| c == ch) {
+                        if ind <= self.puzzle.d as usize {
+                            self.live_filter_string.push(c);
+                        }
                     } else if c == BACKSPACE_CODE {
                         self.live_filter_string.pop();
                     }

@@ -1,9 +1,17 @@
 use crate::Prefs;
 
+pub const DIGITS: &'static str = "0123456789&";
+
 #[derive(Debug, Clone)]
-struct FilterSide {
+enum FilterSelector {
+    Side(i16),   // color
+    Type(usize), // number of stickers
+}
+
+#[derive(Debug, Clone)]
+struct FilterSelectorBool {
     have: bool,
-    color: i16,
+    selector: FilterSelector,
 }
 
 // filters are of the form F!U+FB
@@ -11,7 +19,7 @@ struct FilterSide {
 // (false: i16) = must not have color i16
 // disjunction of conjunctions
 #[derive(Debug, Clone)]
-pub struct Filter(Vec<Vec<FilterSide>>);
+pub struct Filter(Vec<Vec<FilterSelectorBool>>);
 
 impl Default for Filter {
     fn default() -> Self {
@@ -47,14 +55,19 @@ impl Filter {
                     }
 
                     if let Some(ind) = prefs.axes.iter().position(|ax| ax.pos.name == ch) {
-                        filter_sides.push(FilterSide {
+                        filter_sides.push(FilterSelectorBool {
                             have,
-                            color: ind as i16,
+                            selector: FilterSelector::Side(ind as i16),
                         });
                     } else if let Some(ind) = prefs.axes.iter().position(|ax| ax.neg.name == ch) {
-                        filter_sides.push(FilterSide {
+                        filter_sides.push(FilterSelectorBool {
                             have,
-                            color: !(ind as i16),
+                            selector: FilterSelector::Side(!(ind as i16)),
+                        });
+                    } else if let Some(ind) = DIGITS.chars().position(|c| c == ch) {
+                        filter_sides.push(FilterSelectorBool {
+                            have,
+                            selector: FilterSelector::Type(ind),
                         });
                     } else {
                         return Err(format!("invalid character {ch}"));
@@ -74,16 +87,21 @@ impl Filter {
     }
 }
 
-impl FilterSide {
+impl FilterSelector {
     fn matches_stickers(&self, colors: &[i16]) -> bool {
-        colors.iter().any(|e| e == &self.color) == self.have
+        match self {
+            FilterSelector::Side(color) => colors.iter().any(|e| e == color),
+            FilterSelector::Type(n) => colors.len() == *n,
+        }
     }
 }
 
 impl Filter {
     pub fn matches_stickers(&self, colors: &[i16]) -> bool {
-        self.0
-            .iter()
-            .any(|sides| sides.iter().all(|side| side.matches_stickers(colors)))
+        self.0.iter().any(|sides| {
+            sides
+                .iter()
+                .all(|side| side.selector.matches_stickers(colors) == side.have)
+        })
     }
 }
