@@ -14,6 +14,7 @@ use puzzle::{ax, Puzzle, PuzzleTurn, SideTurn, Turn};
 use rand::rngs::ThreadRng;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
+use std::fs::OpenOptions;
 use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::{self, Write};
@@ -200,7 +201,8 @@ impl AppState {
         if let Some(parent) = self.filename.parent() {
             std::fs::create_dir_all(parent)?
         };
-        let file = File::create(self.filename.clone())?;
+        //let file = File::create(self.filename.clone())?;
+        let file = OpenOptions::new().write(true).create(true).open(self.filename.clone())?;
         let mut writer = BufWriter::new(file);
         serde_json::to_writer(&mut writer, &app_log)?;
         writer.flush()?;
@@ -237,12 +239,14 @@ impl AppState {
                     self.scramble = self.puzzle.clone();
                     self.undo_history = vec![];
                     self.redo_history = vec![];
+                    self.filename = Self::new_filename();
                 } else if ch == self.prefs.global_keys.reset {
                     self.puzzle = Puzzle::make_solved(self.puzzle.n, self.puzzle.d);
                     self.message = Some("puzzle reset".to_string());
                     self.scramble = self.puzzle.clone();
                     self.undo_history = vec![];
                     self.redo_history = vec![];
+                    self.filename = Self::new_filename();
                 }
                 self.damage_counter = None;
             }
@@ -257,8 +261,8 @@ impl AppState {
         } else if c == self.prefs.global_keys.save {
             match self.save() {
                 Ok(()) => self.message = Some(format!("saved to {}", self.filename.display())),
-                //Err(err) => self.message = Some(format!("could not save: {}", err)),
-                Err(_err) => self.message = Some("could not save".to_string()),
+                Err(err) => self.message = Some(format!("could not save: {}", err)),
+                //Err(_err) => self.message = Some("could not save".to_string()),
             }
         } else {
             match self.mode {
@@ -699,10 +703,11 @@ fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut state;
     if let Some(log_file) = args.log {
-        let file = File::open(log_file)?;
+        let file = File::open(log_file.clone())?;
         let reader = BufReader::new(file);
         let app_log = serde_json::from_reader(reader).map_err(std::io::Error::other)?;
         state = AppState::from_app_log(app_log, prefs);
+        state.filename = log_file;
     } else {
         let Some(n) = args.n else {
             return Err("n must be specified".into());
