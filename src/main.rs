@@ -261,8 +261,8 @@ impl AppState {
         } else if c == self.prefs.global_keys.save {
             match self.save() {
                 Ok(()) => self.message = Some(format!("saved to {}", self.filename.display())),
-                Err(err) => self.message = Some(format!("could not save: {}", err)),
-                //Err(_err) => self.message = Some("could not save".to_string()),
+                //Err(err) => self.message = Some(format!("could not save: {}", err)),
+                Err(_err) => self.message = Some("could not save".to_string()),
             }
         } else {
             match self.mode {
