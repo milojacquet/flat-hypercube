@@ -206,7 +206,7 @@ impl Puzzle {
         }
     }
 
-    fn piece_body(&self, piece: &[i16]) -> Vec<i16> {
+    pub fn piece_body(&self, piece: &[i16]) -> Vec<i16> {
         if let Some(ind) = piece.iter().position(|x| x.abs() == self.n) {
             let mut piece_body = piece.to_vec();
             if piece[ind] == self.n {

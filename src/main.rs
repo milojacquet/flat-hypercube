@@ -3,7 +3,9 @@ use crate::prefs::ESCAPE_CODE;
 use clap::Parser;
 use crossterm::{
     cursor,
-    event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
+    event::{
+        self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseEvent, MouseEventKind,
+    },
     style::{self, Stylize},
     terminal, ExecutableCommand, QueueableCommand,
 };
@@ -13,6 +15,7 @@ use prefs::Prefs;
 use puzzle::{ax, Puzzle, PuzzleTurn, SideTurn, Turn};
 use rand::rngs::ThreadRng;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
 use std::io::BufWriter;
@@ -109,6 +112,31 @@ enum AppMode {
     LiveFilter,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ClickedStyle {
+    Clicked,
+    OnPiece,
+    Hovered,
+}
+
+impl ClickedStyle {
+    fn open(self) -> char {
+        match self {
+            ClickedStyle::Clicked => '[',
+            ClickedStyle::OnPiece => '‹',
+            ClickedStyle::Hovered => ' ',
+        }
+    }
+
+    fn close(self) -> char {
+        match self {
+            ClickedStyle::Clicked => ']',
+            ClickedStyle::OnPiece => '›',
+            ClickedStyle::Hovered => ' ',
+        }
+    }
+}
+
 struct AppState {
     puzzle: Puzzle,
     scramble: Puzzle,
@@ -129,6 +157,8 @@ struct AppState {
     live_filter_string: String,
     live_filter_pending: Filter,
     live_filter: Filter,
+    hovered: Option<(i16, i16)>,
+    clicked: Vec<Vec<i16>>,
     filename: PathBuf,
     prefs: Prefs,
 }
@@ -161,6 +191,8 @@ impl AppState {
             live_filter_string: "".to_string(),
             live_filter: Default::default(),
             live_filter_pending: Default::default(),
+            hovered: None,
+            clicked: Vec::new(),
             filename: Self::new_filename(),
             prefs,
         }
@@ -650,6 +682,68 @@ impl AppState {
             AppMode::LiveFilter => format!("live filter: {}", self.live_filter_string),
         }
     }
+
+    fn clicked_stickers(&self) -> HashMap<Vec<i16>, ClickedStyle> {
+        let mut out = HashMap::new();
+        for clicked in &self.clicked {
+            let body = self.puzzle.piece_body(clicked);
+            out.insert(body.clone(), ClickedStyle::OnPiece);
+            for i in 0..self.puzzle.d as usize {
+                if body[i] == self.puzzle.n - 1 {
+                    let mut sticker = body.clone();
+                    sticker[i] = self.puzzle.n;
+                    out.insert(sticker, ClickedStyle::OnPiece);
+                }
+                if body[i] == -self.puzzle.n + 1 {
+                    let mut sticker = body.clone();
+                    sticker[i] = -self.puzzle.n;
+                    out.insert(sticker, ClickedStyle::OnPiece);
+                }
+            }
+            out.insert(clicked.clone(), ClickedStyle::Clicked);
+        }
+        out
+    }
+}
+
+fn draw_brackets(
+    stdout: &mut io::Stdout,
+    x: i16,
+    y: i16,
+    style: ClickedStyle,
+    prefs: &Prefs,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let color = prefs.global_colors.clicked;
+    stdout
+        .queue(cursor::MoveTo(x as u16 - 1, y as u16))?
+        .queue(style::PrintStyledContent(style.open().with(color)))?
+        .queue(cursor::MoveTo(x as u16 + 1, y as u16))?
+        .queue(style::PrintStyledContent(style.close().with(color)))?;
+    Ok(())
+}
+
+fn erase_brackets(
+    stdout: &mut io::Stdout,
+    x: i16,
+    y: i16,
+) -> Result<(), Box<dyn std::error::Error>> {
+    stdout
+        .queue(cursor::MoveTo(x as u16 - 1, y as u16))?
+        .queue(style::Print(' '))?
+        .queue(cursor::MoveTo(x as u16 + 1, y as u16))?
+        .queue(style::Print(' '))?;
+    Ok(())
+}
+
+struct StdoutManager;
+
+impl Drop for StdoutManager {
+    fn drop(&mut self) {
+        let mut stdout = io::stdout();
+        let _ = stdout.execute(cursor::Show);
+        let _ = stdout.execute(crossterm::event::DisableMouseCapture);
+        let _ = terminal::disable_raw_mode(); // does this help?
+    }
 }
 
 /// Flat hypercube simulator
@@ -752,13 +846,19 @@ fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
     terminal::enable_raw_mode()?;
     stdout.execute(terminal::EnterAlternateScreen)?;
     stdout.execute(cursor::Hide)?;
+    stdout.execute(crossterm::event::EnableMouseCapture)?;
 
-    loop {
+    let stdout_manager = StdoutManager;
+
+    'event: loop {
+        let previous_message = state.get_message();
+        let previous_hovered = state.hovered;
+        let previous_clicked_stickers = state.clicked_stickers();
+        let mut just_resized = false;
+
         let frame_begin = Instant::now();
 
-        let previous_message = state.get_message();
-        let mut just_resized = false;
-        if event::poll(Duration::from_millis(0))? {
+        while event::poll(Duration::from_millis(0))? {
             match event::read()? {
                 Event::Key(KeyEvent {
                     code,
@@ -767,7 +867,7 @@ fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                     ..
                 }) => match code {
                     KeyCode::Char('c') if modifiers.contains(KeyModifiers::CONTROL) => {
-                        break;
+                        break 'event;
                     }
                     KeyCode::Char(c) => {
                         state.process_key(c, modifiers);
@@ -786,6 +886,32 @@ fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     _ => (),
                 },
+                Event::Mouse(MouseEvent {
+                    kind, column, row, ..
+                }) => {
+                    let key = (column as i16, row as i16);
+                    let sticker = layout.points.get(&key);
+                    if let Some(sticker) = sticker {
+                        match kind {
+                            MouseEventKind::Down(_button) => {
+                                let original_length = state.clicked.len();
+                                state.clicked.retain(|st| {
+                                    st.iter()
+                                        .zip(sticker.iter())
+                                        .any(|(a, b)| (a - b).abs() > 1)
+                                });
+
+                                if original_length == state.clicked.len() {
+                                    state.clicked.push(sticker.clone());
+                                }
+                            }
+                            MouseEventKind::Moved => {
+                                state.hovered = Some(key);
+                            }
+                            _ => {}
+                        }
+                    }
+                }
                 Event::Resize(_, _) => {
                     stdout.execute(terminal::Clear(terminal::ClearType::All))?;
                     just_resized = true;
@@ -796,16 +922,27 @@ fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
 
         let message = state.get_message();
 
-        if previous_message != message || just_resized {
+        if just_resized {
             stdout
                 .queue(cursor::MoveTo(0, layout.height))?
-                .queue(terminal::Clear(terminal::ClearType::CurrentLine))?
+                .queue(terminal::Clear(terminal::ClearType::All))?
                 .flush()?;
-
+        }
+        if previous_message != message {
             stdout
                 .queue(cursor::MoveTo(0, layout.height))?
                 .queue(style::Print(message))?;
         }
+
+        if let Some((x, y)) = previous_hovered {
+            erase_brackets(&mut stdout, x, y)?;
+        }
+
+        if let Some((x, y)) = state.hovered {
+            draw_brackets(&mut stdout, x, y, ClickedStyle::Hovered, &state.prefs)?;
+        }
+
+        let clicked_stickers = state.clicked_stickers();
 
         for ((x, y), pos) in &layout.points {
             // in this loop we are more efficient by not flushing the buffer.
@@ -857,6 +994,14 @@ fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                 stdout
                     .queue(cursor::MoveTo(*x as u16, *y as u16))?
                     .queue(style::PrintStyledContent(ch.with(color)))?;
+            }
+
+            if previous_clicked_stickers.get(pos) != clicked_stickers.get(pos) {
+                erase_brackets(&mut stdout, *x, *y)?;
+            }
+
+            if let Some(style) = clicked_stickers.get(pos) {
+                draw_brackets(&mut stdout, *x, *y, *style, &state.prefs)?;
             }
         }
 
@@ -914,8 +1059,7 @@ fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
         //state.puzzle.turn(0, 2, 2, 1); // R
     }
 
-    stdout.execute(cursor::Show)?;
-    terminal::disable_raw_mode()?; // does this help?
+    drop(stdout_manager);
     Ok(())
 }
 

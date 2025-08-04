@@ -263,7 +263,8 @@
     {
         "piece": "808080",
         "filtered": "505050",
-        "alert": "d86c6c"
+        "alert": "d86c6c",
+        "clicked": "b0b0b0"
     },
     "damage_repeat": 5,
     "alert_frames": 4

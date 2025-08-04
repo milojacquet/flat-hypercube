@@ -72,6 +72,8 @@ pub struct GlobalColors {
     pub filtered: Color,
     #[serde(deserialize_with = "de_color")]
     pub alert: Color,
+    #[serde(deserialize_with = "de_color")]
+    pub clicked: Color,
 }
 
 #[derive(Debug, Clone, Deserialize)]
