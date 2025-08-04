@@ -16,12 +16,12 @@ use puzzle::{ax, Puzzle, PuzzleTurn, SideTurn, Turn};
 use rand::rngs::ThreadRng;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::{self, Write};
 use std::path::PathBuf;
-use std::thread::sleep;
 use std::time::{Duration, Instant};
 
 mod filters;
@@ -112,12 +112,18 @@ enum AppMode {
     LiveFilter,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 enum ClickedStyle {
     Clicked,
     OnPiece,
     Hovered,
 }
+
+static CLICKED_STYLES: &[ClickedStyle] = &[
+    ClickedStyle::Hovered,
+    ClickedStyle::OnPiece,
+    ClickedStyle::Clicked,
+];
 
 impl ClickedStyle {
     fn open(self) -> char {
@@ -943,6 +949,11 @@ fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         let clicked_stickers = state.clicked_stickers();
+        let mut erase_locs = HashSet::new();
+        let mut clicked_locs: HashMap<_, _> = CLICKED_STYLES
+            .into_iter()
+            .map(|s| (s, HashSet::new()))
+            .collect();
 
         for ((x, y), pos) in &layout.points {
             // in this loop we are more efficient by not flushing the buffer.
@@ -997,10 +1008,23 @@ fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             if previous_clicked_stickers.get(pos) != clicked_stickers.get(pos) {
-                erase_brackets(&mut stdout, *x, *y)?;
+                erase_locs.insert((*x, *y));
             }
 
             if let Some(style) = clicked_stickers.get(pos) {
+                clicked_locs
+                    .get_mut(style)
+                    .expect("contains")
+                    .insert((*x, *y));
+            }
+        }
+
+        for (x, y) in erase_locs {
+            erase_brackets(&mut stdout, x, y)?;
+        }
+
+        for style in CLICKED_STYLES {
+            for (x, y) in clicked_locs.get(style).expect("contains") {
                 draw_brackets(&mut stdout, *x, *y, *style, &state.prefs)?;
             }
         }
@@ -1054,7 +1078,7 @@ fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
         let frame_end = Instant::now();
         let frame = frame_end - frame_begin;
         if frame < FRAME_LENGTH {
-            sleep(FRAME_LENGTH - frame);
+            std::thread::sleep(FRAME_LENGTH - frame);
         }
         //state.puzzle.turn(0, 2, 2, 1); // R
     }
