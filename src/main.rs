@@ -638,11 +638,15 @@ impl AppState {
     }
 
     fn perform_turn(&mut self, side: i16, from: i16, to: i16) -> Option<()> {
+        let mut layer_min;
+        let mut layer_max;
         let turn = match self.current_turn.layer {
-            Some(TurnLayer::WholePuzzle) => Turn::Puzzle(PuzzleTurn { from, to }),
+            Some(TurnLayer::WholePuzzle) => {
+                layer_min = -self.puzzle.n + 1;
+                layer_max = self.puzzle.n - 1;
+                Turn::Puzzle(PuzzleTurn { from, to })
+            }
             _ => {
-                let mut layer_min;
-                let mut layer_max;
                 match self.current_turn.layer {
                     None => {
                         layer_min = self.puzzle.n - 1;
@@ -652,7 +656,9 @@ impl AppState {
                         layer_min = self.puzzle.n - 1 - 2 * l;
                         layer_max = self.puzzle.n - 1 - 2 * l;
                     }
-                    Some(TurnLayer::WholePuzzle) => unreachable!(),
+                    Some(TurnLayer::WholePuzzle) => {
+                        unreachable!()
+                    }
                 }
                 if side < 0 {
                     layer_min *= -1;
@@ -668,6 +674,32 @@ impl AppState {
                 })
             }
         };
+
+        // turn clicked stickers
+        {
+            let mut from = from;
+            let mut to = to;
+            let mut side = side;
+            let to_swap = (from < 0) != (to < 0);
+            if from < 0 {
+                from = !from
+            }
+            if to < 0 {
+                to = !to
+            }
+            if side < 0 {
+                side = !side
+            }
+            if to_swap {
+                std::mem::swap(&mut from, &mut to)
+            }
+            for clicked in &mut self.clicked {
+                if (layer_min - 1..=layer_max + 1).contains(&clicked[side as usize]) {
+                    clicked.swap(from as usize, to as usize);
+                    clicked[from as usize] *= -1
+                }
+            }
+        }
 
         self.undo_history.push(turn.clone());
         let turn_out = self.puzzle.turn(turn);
@@ -937,6 +969,7 @@ fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
         if previous_message != message {
             stdout
                 .queue(cursor::MoveTo(0, layout.height))?
+                .queue(terminal::Clear(terminal::ClearType::CurrentLine))?
                 .queue(style::Print(message))?;
         }
 
