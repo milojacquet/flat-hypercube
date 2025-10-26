@@ -1,9 +1,9 @@
 #![allow(dead_code)]
-use crate::BufReader;
 use crossterm::style::Color;
 use serde::de::Error;
 use serde::Deserializer;
 use std::fs::File;
+use std::io::BufReader;
 use std::num::ParseIntError;
 use std::path::Path;
 

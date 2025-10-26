@@ -1,4 +1,4 @@
-use crate::Prefs;
+use crate::prefs::Prefs;
 
 pub const DIGITS: &'static str = "0123456789&";
 
