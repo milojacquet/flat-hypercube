@@ -36,16 +36,20 @@ In this mode, first use the side selector, then use enough axis keys to fix the 
 
 In three dimensions, just pressing a side selector key rotates that side counterclockwise. To rotate it clockwise, use the corresponding face selector key from side mode.
 
-## Saving and loading
+### Saving and loading
 
 Save the current session by using <kbd>Shift</kbd>+<kbd>S</kbd>. A session can be loaded by passing it in with `--log`.
 
-## Piece filters
+### Piece filters
 
 Flat hypercube supports passing piece filters from a file via the `--filters` option. Each line of the file should contain one filter. A filter consists of a sequence of terms separated by `+`, where each term consists of one or more selector characters, optionally followed by `!` and more selector characters. Each term shows pieces that match the selectors before the `!` and do not match the selectors after the `!`. A selector character can either be the name of a facet, which selects pieces with that facet's color, or a number from `0` to `9` or `&`, which represents 10, which selects pieces with that many colors. The filter shows all pieces that are shown in at least one term. To use the next filter, use <kbd>Shift</kbd>+<kbd>K</kbd>, and to use the previous filter, use <kbd>Shift</kbd>+<kbd>J</kbd>.
 
 Live filter creation is also supported. To do this, use use <kbd>Shift</kbd>+<kbd>F</kbd> to enter live filter mode. Facet names are entered via their selector keybind in lowercase, or by typing their name in capital (Greek letters are supported), and `+`, `!`, and digits are entered normally. To confirm, use <kbd>Enter</kbd>, and to cancel, use <kbd>Esc</kbd>.
 
-## Miscellaneous
+### Miscellaneous
 
-The status message can be cleared and mode returned to default by pressing <kbd>Esc</kbd>. 
+The status message can be cleared and mode returned to default by pressing <kbd>Esc</kbd>.
+
+## Use as a crate
+
+Flat hypercube can be used as a crate. This funcationality is very rough. Use `AppState::process_key` to process input, `State::make_layout` to make the layout, and the `puzzle` field of `State` to read the current puzzle state.

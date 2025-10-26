@@ -302,7 +302,11 @@ impl AppState {
             })
     }
 
-    fn process_key(&mut self, c: char, _mods: KeyModifiers) {
+    pub fn make_layout(&self, compact: bool, vertical: bool) -> Layout {
+        Layout::make_layout(self.puzzle.n, self.puzzle.d, compact, vertical).move_right(1)
+    }
+
+    pub fn process_key(&mut self, c: char) {
         self.message = None;
         if c == self.prefs.global_keys.scramble || c == self.prefs.global_keys.reset {
             match self.damage_counter {
@@ -894,8 +898,7 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
             .collect();
     }
 
-    let layout = Layout::make_layout(state.puzzle.n, state.puzzle.d, args.compact, args.vertical)
-        .move_right(1);
+    let layout = state.make_layout(args.compact, args.vertical);
     //println!("{:?}", layout.keybind_hints);
     //return Ok(());
 
@@ -927,19 +930,19 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                         break 'event;
                     }
                     KeyCode::Char(c) => {
-                        state.process_key(c, modifiers);
+                        state.process_key(c);
                     }
                     KeyCode::Tab => {
-                        state.process_key('\t', modifiers);
+                        state.process_key('\t');
                     }
                     KeyCode::Esc => {
-                        state.process_key(ESCAPE_CODE, modifiers);
+                        state.process_key(ESCAPE_CODE);
                     }
                     KeyCode::Enter => {
-                        state.process_key('\n', modifiers);
+                        state.process_key('\n');
                     }
                     KeyCode::Backspace => {
-                        state.process_key(BACKSPACE_CODE, modifiers);
+                        state.process_key(BACKSPACE_CODE);
                     }
                     _ => (),
                 },
