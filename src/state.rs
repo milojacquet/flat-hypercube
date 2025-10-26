@@ -178,8 +178,36 @@ struct AppLog {
 }
 
 impl AppState {
-    fn new(n: i16, d: u16, prefs: Prefs) -> Self {
-        Self {
+    fn new(n: Option<i16>, d: Option<u16>, prefs: Prefs) -> Result<Self, String> {
+        let Some(n) = n else {
+            return Err("n must be specified".into());
+        };
+        let Some(d) = d else {
+            return Err("d must be specified".into());
+        };
+
+        if d > prefs.max_dim() {
+            return Err(format!(
+                "dimension should be less than or equal to {}",
+                prefs.max_dim()
+            )
+            .into());
+        }
+        if d < 1 {
+            return Err("dimension should be greater than 0".into());
+        }
+        if n > prefs.max_layers() {
+            return Err(format!(
+                "side should be less than or equal to {}",
+                prefs.max_layers()
+            )
+            .into());
+        }
+        if d < 1 {
+            return Err("side should be greater than 0".into());
+        }
+
+        Ok(Self {
             puzzle: Puzzle::make_solved(n, d),
             scramble: Puzzle::make_solved(n, d),
             mode: Default::default(),
@@ -203,7 +231,7 @@ impl AppState {
             clicked: Vec::new(),
             filename: Self::new_filename(),
             prefs,
-        }
+        })
     }
 
     fn to_app_log(&self) -> AppLog {
@@ -214,7 +242,8 @@ impl AppState {
     }
 
     fn from_app_log(app_log: AppLog, prefs: Prefs) -> Self {
-        let mut state = AppState::new(app_log.scramble.n, app_log.scramble.d, prefs);
+        let mut state = AppState::new(Some(app_log.scramble.n), Some(app_log.scramble.d), prefs)
+            .expect("valid log");
         state.scramble = app_log.scramble.clone();
         state.puzzle = app_log.scramble;
         state.undo_history = app_log.moves.clone();
@@ -854,35 +883,7 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
         let app_log = serde_json::from_reader(reader).map_err(std::io::Error::other)?;
         state = AppState::from_app_log(app_log, prefs);
     } else {
-        let Some(n) = args.n else {
-            return Err("n must be specified".into());
-        };
-        let Some(d) = args.d else {
-            return Err("d must be specified".into());
-        };
-
-        if d > prefs.max_dim() {
-            return Err(format!(
-                "dimension should be less than or equal to {}",
-                prefs.max_dim()
-            )
-            .into());
-        }
-        if d < 1 {
-            return Err("dimension should be greater than 0".into());
-        }
-        if n > prefs.max_layers() {
-            return Err(format!(
-                "side should be less than or equal to {}",
-                prefs.max_layers()
-            )
-            .into());
-        }
-        if d < 1 {
-            return Err("side should be greater than 0".into());
-        }
-
-        state = AppState::new(n, d, prefs);
+        state = AppState::new(args.n, args.d, prefs)?;
     }
 
     if let Some(path) = args.filters {
