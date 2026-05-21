@@ -912,6 +912,7 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
     let (mut term_w, mut term_h) = terminal::size()?;
     let mut scroll_x: i16 = 0;
     let mut scroll_y: i16 = 0;
+    let mut prev_mouse_pos: Option<(u16, u16)> = None;
 
     'event: loop {
         let previous_message = state.get_message();
@@ -1010,6 +1011,30 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                             scroll_x = (scroll_x + SCROLL_STEP_WHEEL)
                                 .min(layout.width.saturating_sub(term_w) as i16);
                             continue;
+                        }
+                        MouseEventKind::Drag(_) => {
+                            if let Some((prev_col, prev_row)) = prev_mouse_pos {
+                                let dx = prev_col as i16 - column as i16;
+                                let dy = prev_row as i16 - row as i16;
+                                scroll_x = (scroll_x + dx)
+                                    .clamp(0, layout.width.saturating_sub(term_w) as i16);
+                                scroll_y = (scroll_y + dy).clamp(
+                                    0,
+                                    layout
+                                        .height
+                                        .saturating_sub(term_h.saturating_sub(1))
+                                        as i16,
+                                );
+                            }
+                            prev_mouse_pos = Some((column, row));
+                            continue;
+                        }
+                        MouseEventKind::Up(_) => {
+                            prev_mouse_pos = None;
+                            continue;
+                        }
+                        MouseEventKind::Down(_) => {
+                            prev_mouse_pos = Some((column, row));
                         }
                         _ => {}
                     }
