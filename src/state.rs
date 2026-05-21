@@ -907,6 +907,12 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
 
     let stdout_manager = StdoutManager;
 
+    const SCROLL_STEP_WHEEL: i16 = 3;
+
+    let (mut term_w, mut term_h) = terminal::size()?;
+    let mut scroll_x: i16 = 0;
+    let mut scroll_y: i16 = 0;
+
     'event: loop {
         let previous_message = state.get_message();
         let previous_hovered = state.hovered;
@@ -914,6 +920,7 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
         let mut just_resized = false;
 
         let frame_begin = Instant::now();
+        let scroll_before = (scroll_x, scroll_y);
 
         while event::poll(Duration::from_millis(0))? {
             match event::read()? {
@@ -941,12 +948,72 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                     KeyCode::Backspace => {
                         state.process_key(BACKSPACE_CODE);
                     }
+                    KeyCode::Up => {
+                        let step = (term_h.saturating_sub(1) as i16 * 3 / 4).max(1);
+                        scroll_y = (scroll_y - step).max(0);
+                    }
+                    KeyCode::Down => {
+                        let step = (term_h.saturating_sub(1) as i16 * 3 / 4).max(1);
+                        scroll_y = (scroll_y + step).min(
+                            layout
+                                .height
+                                .saturating_sub(term_h.saturating_sub(1))
+                                as i16,
+                        );
+                    }
+                    KeyCode::Left => {
+                        let step = (term_w as i16 * 3 / 4).max(1);
+                        scroll_x = (scroll_x - step).max(0);
+                    }
+                    KeyCode::Right => {
+                        let step = (term_w as i16 * 3 / 4).max(1);
+                        scroll_x = (scroll_x + step)
+                            .min(layout.width.saturating_sub(term_w) as i16);
+                    }
                     _ => (),
                 },
                 Event::Mouse(MouseEvent {
-                    kind, column, row, ..
+                    kind,
+                    column,
+                    row,
+                    modifiers,
+                    ..
                 }) => {
-                    let key = (column as i16, row as i16);
+                    match kind {
+                        MouseEventKind::ScrollUp => {
+                            if modifiers.contains(KeyModifiers::SHIFT) {
+                                scroll_x = (scroll_x - SCROLL_STEP_WHEEL).max(0);
+                            } else {
+                                scroll_y = (scroll_y - SCROLL_STEP_WHEEL).max(0);
+                            }
+                            continue;
+                        }
+                        MouseEventKind::ScrollDown => {
+                            if modifiers.contains(KeyModifiers::SHIFT) {
+                                scroll_x = (scroll_x + SCROLL_STEP_WHEEL)
+                                    .min(layout.width.saturating_sub(term_w) as i16);
+                            } else {
+                                scroll_y = (scroll_y + SCROLL_STEP_WHEEL).min(
+                                    layout
+                                        .height
+                                        .saturating_sub(term_h.saturating_sub(1))
+                                        as i16,
+                                );
+                            }
+                            continue;
+                        }
+                        MouseEventKind::ScrollLeft => {
+                            scroll_x = (scroll_x - SCROLL_STEP_WHEEL).max(0);
+                            continue;
+                        }
+                        MouseEventKind::ScrollRight => {
+                            scroll_x = (scroll_x + SCROLL_STEP_WHEEL)
+                                .min(layout.width.saturating_sub(term_w) as i16);
+                            continue;
+                        }
+                        _ => {}
+                    }
+                    let key = (column as i16 + scroll_x, row as i16 + scroll_y);
                     let sticker = layout.points.get(&key);
                     if let Some(sticker) = sticker {
                         match kind {
@@ -970,6 +1037,17 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
                 Event::Resize(_, _) => {
+                    let (new_w, new_h) = terminal::size()?;
+                    term_w = new_w;
+                    term_h = new_h;
+                    scroll_x =
+                        scroll_x.min(layout.width.saturating_sub(term_w) as i16);
+                    scroll_y = scroll_y.min(
+                        layout
+                            .height
+                            .saturating_sub(term_h.saturating_sub(1))
+                            as i16,
+                    );
                     stdout.execute(terminal::Clear(terminal::ClearType::All))?;
                     just_resized = true;
                 }
@@ -977,27 +1055,37 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
+        if (scroll_x, scroll_y) != scroll_before {
+            stdout.execute(terminal::Clear(terminal::ClearType::All))?;
+        }
+
         let message = state.get_message();
 
         if just_resized {
             stdout
-                .queue(cursor::MoveTo(0, layout.height))?
+                .queue(cursor::MoveTo(0, term_h.saturating_sub(1)))?
                 .queue(terminal::Clear(terminal::ClearType::All))?
                 .flush()?;
         }
         if previous_message != message {
             stdout
-                .queue(cursor::MoveTo(0, layout.height))?
+                .queue(cursor::MoveTo(0, term_h.saturating_sub(1)))?
                 .queue(terminal::Clear(terminal::ClearType::CurrentLine))?
                 .queue(style::Print(message))?;
         }
 
         if let Some((x, y)) = previous_hovered {
-            erase_brackets(&mut stdout, x, y)?;
+            erase_brackets(&mut stdout, x - scroll_x, y - scroll_y)?;
         }
 
         if let Some((x, y)) = state.hovered {
-            draw_brackets(&mut stdout, x, y, ClickedStyle::Hovered, &state.prefs)?;
+            draw_brackets(
+                &mut stdout,
+                x - scroll_x,
+                y - scroll_y,
+                ClickedStyle::Hovered,
+                &state.prefs,
+            )?;
         }
 
         let clicked_stickers = state.clicked_stickers();
@@ -1008,6 +1096,15 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
             .collect();
 
         for ((x, y), pos) in &layout.points {
+            let screen_x = *x - scroll_x;
+            let screen_y = *y - scroll_y;
+            if screen_x < 0
+                || screen_x >= term_w as i16
+                || screen_y < 0
+                || screen_y >= term_h.saturating_sub(1) as i16
+            {
+                continue;
+            }
             // in this loop we are more efficient by not flushing the buffer.
             let ch;
             let color;
@@ -1040,7 +1137,7 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                     state.prefs.axes[(!side) as usize].neg.color
                 };
                 stdout
-                    .queue(cursor::MoveTo(*x as u16, *y as u16))?
+                    .queue(cursor::MoveTo(screen_x as u16, screen_y as u16))?
                     .queue(style::PrintStyledContent(ch.with(color)))?;
             } else if !matches!(layout.keybind_hints.get(&(*x, *y)), Some(Some(_))) {
                 if state.alert % (state.prefs.alert_frames * 2) >= state.prefs.alert_frames {
@@ -1055,19 +1152,19 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                     };
                 }
                 stdout
-                    .queue(cursor::MoveTo(*x as u16, *y as u16))?
+                    .queue(cursor::MoveTo(screen_x as u16, screen_y as u16))?
                     .queue(style::PrintStyledContent(ch.with(color)))?;
             }
 
             if previous_clicked_stickers.get(pos) != clicked_stickers.get(pos) {
-                erase_locs.insert((*x, *y));
+                erase_locs.insert((screen_x, screen_y));
             }
 
             if let Some(style) = clicked_stickers.get(pos) {
                 clicked_locs
                     .get_mut(style)
                     .expect("contains")
-                    .insert((*x, *y));
+                    .insert((screen_x, screen_y));
             }
         }
 
@@ -1082,6 +1179,15 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         for ((x, y), side) in &layout.keybind_hints {
+            let screen_x = *x - scroll_x;
+            let screen_y = *y - scroll_y;
+            if screen_x < 0
+                || screen_x >= term_w as i16
+                || screen_y < 0
+                || screen_y >= term_h.saturating_sub(1) as i16
+            {
+                continue;
+            }
             // in this loop we are more efficient by not flushing the buffer.
             let ch;
             let color;
@@ -1116,13 +1222,12 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                 color = state.prefs.global_colors.piece;
 
                 stdout
-                    .queue(cursor::MoveTo(*x as u16, *y as u16))?
+                    .queue(cursor::MoveTo(screen_x as u16, screen_y as u16))?
                     .queue(style::PrintStyledContent(ch.with(color)))?;
             }
-            //state.message = format!("{:?}", (x, y, side)).into();
         }
 
-        stdout.queue(cursor::MoveTo(0, layout.height))?.flush()?;
+        stdout.queue(cursor::MoveTo(0, term_h.saturating_sub(1)))?.flush()?;
 
         if state.alert > 0 {
             state.alert -= 1;
