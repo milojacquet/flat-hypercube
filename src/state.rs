@@ -1,7 +1,6 @@
 use crate::filters;
 use crate::filters::Filter;
 use crate::layout::Layout;
-use crate::prefs;
 use crate::prefs::Prefs;
 use crate::prefs::BACKSPACE_CODE;
 use crate::prefs::ESCAPE_CODE;
@@ -871,13 +870,11 @@ struct Args {
 
 pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
-    let prefs: Prefs = {
-        let path = args
-            .prefs
-            .unwrap_or(PathBuf::from(prefs::DEFAULT_FILE_PATH_STR));
+    let prefs: Prefs = if let Some(path) = args.prefs {
         let file = File::open(path)?;
-        let reader = BufReader::new(file);
-        serde_json::from_reader(reader)?
+        serde_json::from_reader(BufReader::new(file))?
+    } else {
+        Prefs::load_default()?
     };
 
     let mut state;

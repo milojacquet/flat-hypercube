@@ -2,17 +2,14 @@
 use crossterm::style::Color;
 use serde::de::Error;
 use serde::Deserializer;
-use std::fs::File;
-use std::io::BufReader;
 use std::num::ParseIntError;
-use std::path::Path;
 
 use rgb2ansi256::rgb_to_ansi256;
 use serde::Deserialize;
 
 pub const ESCAPE_CODE: char = '⎋';
 pub const BACKSPACE_CODE: char = '⌫';
-pub const DEFAULT_FILE_PATH_STR: &'static str = "default_prefs.json";
+pub const DEFAULT_FILE_PATH_STR: &str = include_str!("../default_prefs.json");
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Prefs {
@@ -25,9 +22,7 @@ pub struct Prefs {
 
 impl Prefs {
     pub fn load_default() -> Result<Self, Box<dyn std::error::Error>> {
-        let file = File::open(Path::new(DEFAULT_FILE_PATH_STR))?;
-        let reader = BufReader::new(file);
-        Ok(serde_json::from_reader(reader)?)
+        Ok(serde_json::from_str(DEFAULT_FILE_PATH_STR)?)
     }
 
     pub fn pos_keys(&self) -> impl Iterator<Item = char> + '_ {
