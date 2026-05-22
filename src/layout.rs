@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::iter::once;
 
 const GAPS: &[i16] = &[0, 1, 0, 2, 1, 10, 4, 40, 18, 160, 72];
+const GAPS_SEMI: &[i16] = &[0, 1, 0, 2, 1, 3, 1, 3, 1, 3, 1];
 const GAPS_COMPACT: &[i16] = &[0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0];
 
 #[derive(Debug, Clone)]
@@ -139,8 +140,8 @@ impl Layout {
         lower
     }
 
-    pub fn make_layout(n: i16, d: u16, compact: bool, vertical: bool) -> Layout {
-        let gaps = if compact { GAPS_COMPACT } else { GAPS };
+    pub fn make_layout(n: i16, d: u16, semi_compact: bool, compact: bool, vertical: bool) -> Layout {
+        let gaps = if compact { GAPS_COMPACT } else if semi_compact { GAPS_SEMI } else { GAPS };
 
         if d == 0 {
             Layout {
@@ -156,7 +157,7 @@ impl Layout {
         } else {
             let make_horizontal = d % 2 == 1 && !vertical;
 
-            let lower = Self::make_layout(n, ((d as i16) - 1) as u16, compact, false);
+            let lower = Self::make_layout(n, ((d as i16) - 1) as u16, semi_compact, compact, false);
             let mut row = vec![];
 
             for i in once(-n).chain((-n + 1..n).step_by(2)).chain(once(n)) {

@@ -1,6 +1,6 @@
 [package]
 name = "flat-hypercube"
-version = "1.0.0"
+version = "2026.5.22"
 edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

@@ -23,9 +23,34 @@ use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::{self, Write};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 const FRAME_LENGTH: Duration = Duration::from_millis(1000 / 30);
+
+static CTRL_C_PRESSED: AtomicBool = AtomicBool::new(false);
+
+#[cfg(windows)]
+unsafe extern "system" {
+    fn SetConsoleCtrlHandler(
+        handler: Option<unsafe extern "system" fn(u32) -> i32>,
+        add: i32,
+    ) -> i32;
+}
+
+#[cfg(windows)]
+unsafe extern "system" fn console_ctrl_handler(ctrl_type: u32) -> i32 {
+    const CTRL_C_EVENT: u32 = 0;
+    const CTRL_BREAK_EVENT: u32 = 1;
+    if ctrl_type == CTRL_C_EVENT || ctrl_type == CTRL_BREAK_EVENT {
+        if CTRL_C_PRESSED.swap(true, Ordering::SeqCst) {
+            return 0; // second Ctrl+C — let default handler terminate
+        }
+        1
+    } else {
+        0 // pass through for close/logoff events
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TurnLayer {
@@ -301,8 +326,8 @@ impl AppState {
             })
     }
 
-    pub fn make_layout(&self, compact: bool, vertical: bool) -> Layout {
-        Layout::make_layout(self.puzzle.n, self.puzzle.d, compact, vertical).move_right(1)
+    pub fn make_layout(&self, semi_compact: bool, compact: bool, vertical: bool) -> Layout {
+        Layout::make_layout(self.puzzle.n, self.puzzle.d, semi_compact, compact, vertical).move_right(1)
     }
 
     pub fn process_key(&mut self, c: char) {
@@ -830,7 +855,8 @@ impl Drop for StdoutManager {
         let mut stdout = io::stdout();
         let _ = stdout.execute(cursor::Show);
         let _ = stdout.execute(crossterm::event::DisableMouseCapture);
-        let _ = terminal::disable_raw_mode(); // does this help?
+        let _ = terminal::disable_raw_mode();
+        let _ = stdout.execute(terminal::LeaveAlternateScreen);
     }
 }
 
@@ -843,8 +869,12 @@ struct Args {
     /// Dimension of the puzzle
     d: Option<u16>,
 
-    /// Display in compact mode
-    #[arg(short, long)]
+    /// Display in semi-compact mode (1-char gaps between layers)
+    #[arg(short = 'c')]
+    semi_compact: bool,
+
+    /// Display in compact mode (no gaps between layers)
+    #[arg(long)]
     compact: bool,
 
     /// File that contains the filters for the solve, one per line
@@ -895,7 +925,7 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
             .collect();
     }
 
-    let layout = state.make_layout(args.compact, args.vertical);
+    let layout = state.make_layout(args.semi_compact, args.compact, args.vertical);
     //println!("{:?}", layout.keybind_hints);
     //return Ok(());
 
@@ -906,6 +936,11 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
     stdout.execute(crossterm::event::EnableMouseCapture)?;
 
     let stdout_manager = StdoutManager;
+
+    #[cfg(windows)]
+    unsafe {
+        SetConsoleCtrlHandler(Some(console_ctrl_handler), 1);
+    }
 
     const SCROLL_STEP_WHEEL: i16 = 3;
 
@@ -1078,6 +1113,10 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 _ => (),
             }
+        }
+
+        if CTRL_C_PRESSED.load(Ordering::SeqCst) {
+            break 'event;
         }
 
         if (scroll_x, scroll_y) != scroll_before {
