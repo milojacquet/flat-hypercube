@@ -1,9 +1,74 @@
 use std::collections::HashMap;
 use std::iter::once;
 
-const GAPS: &[i16] = &[0, 1, 0, 2, 1, 10, 4, 40, 18, 160, 72];
-const GAPS_SEMI: &[i16] = &[0, 1, 0, 2, 1, 3, 1, 3, 1, 3, 1];
-const GAPS_COMPACT: &[i16] = &[0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0];
+const RATIO: i16 = 2; // terminal char aspect ratio: ~0.5 width/height
+
+fn compute_gaps(n: i16, max_d: u16, semi_compact: bool, compact: bool) -> Vec<i16> {
+    let max_idx = max_d as usize + 2; // +2 for vertical-mode d+1 access
+    let mut gaps = vec![0i16; max_idx];
+
+    if compact {
+        for d in 0..max_idx {
+            gaps[d] = if d % 2 == 0 { 0 } else { 1 };
+        }
+        return gaps;
+    }
+
+    if semi_compact {
+        // first 5: [0, 1, 0, 2, 1], then alternating 3, 1, 3, 1...
+        gaps[0] = 0;
+        gaps[1] = 1;
+        gaps[2] = 0;
+        gaps[3] = 2;
+        gaps[4] = 1;
+        for d in 5..max_idx {
+            gaps[d] = if d % 2 == 0 { 1 } else { 3 };
+        }
+        return gaps;
+    }
+
+    // Regular mode: first 5 fixed
+    gaps[0] = 0;
+    gaps[1] = 1;
+    gaps[2] = 0;
+    gaps[3] = 2;
+    gaps[4] = 1;
+
+    if max_idx <= 6 {
+        return gaps;
+    }
+
+    // C[d] = cavity height, O[d] = outer sticker height (even d only)
+    let mut c = vec![0i16; max_idx];
+    let mut o = vec![0i16; max_idx];
+
+    c[2] = n;
+    o[2] = 1;
+    // C(4) = n * C(2) + (n-1) * (2*O(2) + gap[4])
+    c[4] = n * c[2] + (n - 1) * (2 * o[2] + gaps[4]);
+    o[4] = c[2];
+
+    // accumulator = O(2) + Σ_{even k, 4≤k≤d-4} (O(k) + gap[k])
+    let mut acc = o[2];
+
+    for d in (6..max_idx).step_by(2) {
+        gaps[d] = gaps[d - 2] + 2 * acc + 1;
+
+        // acc_c = acc + C(d-4) + gap(d-2) = O(2) + Σ_{even k, 4≤k≤d-2} (C(k-2) + gap[k])
+        let acc_c = acc + c[d - 4] + gaps[d - 2];
+        let t = gaps[d] + 2 * acc_c;
+        c[d] = n * c[d - 2] + (n - 1) * t;
+        o[d] = c[d - 2];
+
+        acc += c[d - 4] + gaps[d - 2];
+    }
+
+    for d in (5..max_idx.saturating_sub(1)).step_by(2) {
+        gaps[d] = gaps[d + 1] * RATIO;
+    }
+
+    gaps
+}
 
 #[derive(Debug, Clone)]
 pub struct Layout {
@@ -141,8 +206,11 @@ impl Layout {
     }
 
     pub fn make_layout(n: i16, d: u16, semi_compact: bool, compact: bool, vertical: bool) -> Layout {
-        let gaps = if compact { GAPS_COMPACT } else if semi_compact { GAPS_SEMI } else { GAPS };
+        let gaps = compute_gaps(n, d, semi_compact, compact);
+        Self::make_layout_inner(n, d, vertical, &gaps)
+    }
 
+    fn make_layout_inner(n: i16, d: u16, vertical: bool, gaps: &[i16]) -> Layout {
         if d == 0 {
             Layout {
                 width: 1,
@@ -157,7 +225,7 @@ impl Layout {
         } else {
             let make_horizontal = d % 2 == 1 && !vertical;
 
-            let lower = Self::make_layout(n, ((d as i16) - 1) as u16, semi_compact, compact, false);
+            let lower = Self::make_layout_inner(n, d - 1, false, gaps);
             let mut row = vec![];
 
             for i in once(-n).chain((-n + 1..n).step_by(2)).chain(once(n)) {
@@ -186,11 +254,13 @@ impl Layout {
 
                 row.push(lower);
             }
+            let gap_idx = d as usize
+                + if vertical && d % 2 == 1 { 1 } else { 0 };
             if make_horizontal {
-                Self::concat_horiz(row, gaps[d as usize])
+                Self::concat_horiz(row, gaps[gap_idx])
             } else {
                 row.reverse();
-                Self::concat_vert(row, gaps[d as usize])
+                Self::concat_vert(row, gaps[gap_idx])
             }
         }
     }
