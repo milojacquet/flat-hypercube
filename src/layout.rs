@@ -38,29 +38,17 @@ fn compute_gaps(n: i16, max_d: u16, semi_compact: bool, compact: bool) -> Vec<i1
         return gaps;
     }
 
-    // C[d] = cavity height, O[d] = outer sticker height (even d only)
+    // C[d] = cavity height (even d), c[0] = 1
     let mut c = vec![0i16; max_idx];
-    let mut o = vec![0i16; max_idx];
-
+    c[0] = 1;
     c[2] = n;
-    o[2] = 1;
-    // C(4) = n * C(2) + (n-1) * (2*O(2) + gap[4])
-    c[4] = n * c[2] + (n - 1) * (2 * o[2] + gaps[4]);
-    o[4] = c[2];
-
-    // accumulator = O(2) + Σ_{even k, 4≤k≤d-4} (O(k) + gap[k])
-    let mut acc = o[2];
+    // acc = c[0] + Σ_{even k, 4≤k≤d-2} (C(k-2) + gap[k])
+    let mut acc = 0;
 
     for d in (6..max_idx).step_by(2) {
+        acc += c[d - 6] + gaps[d - 4];
+        c[d - 2] = n * c[d - 4] + (n - 1) * (gaps[d - 2] + 2 * acc);
         gaps[d] = gaps[d - 2] + 2 * acc + 1;
-
-        // acc_c = acc + C(d-4) + gap(d-2) = O(2) + Σ_{even k, 4≤k≤d-2} (C(k-2) + gap[k])
-        let acc_c = acc + c[d - 4] + gaps[d - 2];
-        let t = gaps[d] + 2 * acc_c;
-        c[d] = n * c[d - 2] + (n - 1) * t;
-        o[d] = c[d - 2];
-
-        acc += c[d - 4] + gaps[d - 2];
     }
 
     for d in (5..max_idx.saturating_sub(1)).step_by(2) {
