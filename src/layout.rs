@@ -4,7 +4,7 @@ use std::iter::once;
 const RATIO: i16 = 2; // terminal char aspect ratio: ~0.5 width/height
 
 fn compute_gaps(n: i16, max_d: u16, semi_compact: bool, compact: bool) -> Vec<i16> {
-    let max_idx = max_d as usize + 2; // +2 for vertical-mode d+1 access
+    let max_idx = (max_d as usize + 2).max(5); // +2 for vertical-mode d+1 access, min 5 for first-5 init
     let mut gaps = vec![0i16; max_idx];
 
     if compact {
