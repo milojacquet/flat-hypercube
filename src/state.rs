@@ -448,6 +448,7 @@ impl AppState {
                         self.current_turn.layer = Some(TurnLayer::Layer(s as i16));
                     } else if !self.awaiting_side_as_axis()
                         && let Some(s) = self.get_side(c)
+                        && !(self.current_turn.side.is_some() && self.get_axis_key(c).is_some())
                     {
                         if s.max(!s) as u16 >= self.puzzle.d {
                             return;
@@ -479,7 +480,7 @@ impl AppState {
 
                             if (self.current_turn.side.is_some()
                                 || self.current_turn.layer == Some(TurnLayer::WholePuzzle))
-                                && !(strict && just_pressed_side)
+                                && !just_pressed_side
                                 && let Some(s) = axis
                             {
                                 if ax(s) as u16 >= self.puzzle.d {
@@ -570,7 +571,8 @@ impl AppState {
                         KeybindSet::FixedKey => {
                             let axis = self.get_axis_key(c);
 
-                            if let Some(s) = axis {
+                            if !just_pressed_side
+                                && let Some(s) = axis {
                                 if ax(s) as u16 >= self.puzzle.d {
                                     return;
                                 }
