@@ -212,7 +212,8 @@ impl AppState {
 
         if d > prefs.max_dim() {
             return Err(format!(
-                "dimension should be less than or equal to {}",
+                "dimension {} exceeds the {} axes defined in this prefs config",
+                d,
                 prefs.max_dim()
             )
             .into());
@@ -222,13 +223,14 @@ impl AppState {
         }
         if n > prefs.max_layers() {
             return Err(format!(
-                "side should be less than or equal to {}",
+                "layers {} exceeds the {} layer keys defined in this prefs config",
+                n,
                 prefs.max_layers()
             )
             .into());
         }
-        if d < 1 {
-            return Err("side should be greater than 0".into());
+        if n < 1 {
+            return Err("layers should be greater than 0".into());
         }
 
         Ok(Self {
@@ -908,6 +910,7 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         Prefs::load_default()?
     };
+    prefs.validate()?;
 
     let mut state;
     if let Some(log_file) = args.log {

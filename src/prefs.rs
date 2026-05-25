@@ -36,6 +36,76 @@ impl Prefs {
     pub fn max_layers(&self) -> i16 {
         (self.global_keys.layers.len() * 2 + 1) as i16
     }
+
+    pub fn validate(&self) -> Result<(), String> {
+        use std::collections::HashSet;
+
+        // Same field across different (axis + direction) must be unique.
+        // select and side each span all pos/neg directions; axis_key spans all axes.
+        // Different fields (select vs side vs axis_key) never conflict.
+        let mut selects = HashSet::new();
+        let mut sides = HashSet::new();
+        for (i, ax) in self.axes.iter().enumerate() {
+            for (dir, keys) in [("pos", &ax.pos.keys), ("neg", &ax.neg.keys)] {
+                if keys.select != '∅' && !selects.insert(keys.select) {
+                    return Err(format!(
+                        "duplicate select key '{0}' in axis {i} {dir}",
+                        keys.select
+                    ));
+                }
+                if keys.side != '∅' && !sides.insert(keys.side) {
+                    return Err(format!(
+                        "duplicate side key '{0}' in axis {i} {dir}",
+                        keys.side
+                    ));
+                }
+            }
+        }
+
+        let mut axis_keys = HashSet::new();
+        for (i, ax) in self.axes.iter().enumerate() {
+            if ax.axis_key != '∅' && !axis_keys.insert(ax.axis_key) {
+                return Err(format!(
+                    "duplicate axis_key '{0}' in axis {i}",
+                    ax.axis_key
+                ));
+            }
+        }
+
+        // Any axis key must not conflict with global keys
+        let all: HashSet<char> = selects.iter()
+            .chain(sides.iter()).chain(axis_keys.iter()).copied().collect();
+        let gk = &self.global_keys;
+        for (i, &ch) in gk.layers.iter().enumerate() {
+            if all.contains(&ch) {
+                return Err(format!(
+                    "key '{ch}' in layer key[{i}] conflicts with an axis key"
+                ));
+            }
+        }
+        for (label, ch) in [
+            ("global rotate", gk.rotate),
+            ("global scramble", gk.scramble),
+            ("global reset", gk.reset),
+            ("global keybind_mode", gk.keybind_mode),
+            ("global axis_mode", gk.axis_mode),
+            ("global undo", gk.undo),
+            ("global redo", gk.redo),
+            ("global next_filter", gk.next_filter),
+            ("global prev_filter", gk.prev_filter),
+            ("global live_filter_mode", gk.live_filter_mode),
+            ("global reset_mode", gk.reset_mode),
+            ("global save", gk.save),
+        ] {
+            if all.contains(&ch) {
+                return Err(format!(
+                    "key '{ch}' in {label} conflicts with an axis key"
+                ));
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
