@@ -1119,7 +1119,8 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
             break 'event;
         }
 
-        if (scroll_x, scroll_y) != scroll_before {
+        let scrolled = (scroll_x, scroll_y) != scroll_before;
+        if scrolled {
             stdout.execute(terminal::Clear(terminal::ClearType::All))?;
         }
 
@@ -1131,11 +1132,11 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                 .queue(terminal::Clear(terminal::ClearType::All))?
                 .flush()?;
         }
-        if previous_message != message {
+        if previous_message != message || scrolled || just_resized {
             stdout
                 .queue(cursor::MoveTo(0, term_h.saturating_sub(1)))?
                 .queue(terminal::Clear(terminal::ClearType::CurrentLine))?
-                .queue(style::Print(message))?;
+                .queue(style::Print(&message))?;
         }
 
         if let Some((x, y)) = previous_hovered {
