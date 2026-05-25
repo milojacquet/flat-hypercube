@@ -1,18 +1,19 @@
 ## Flat hypercube simulator
 
-This is a program that allows you to solve hypercubes in up to 10 dimensions using a flat projection. It supports keybinds.
+This is a program that allows you to solve hypercubes in any number of dimensions using a flat projection, by providing a custom prefs file that defines additional axes. It supports keybinds.
 
-The projection is recursive in the number of dimensions. A puzzle of dimension 0 just has a single piece with no stickers: the core. When a dimension is added, multiple copies of the previous dimension's puzzle are placed next to each other, along with a cap on either end. In each cap, the stickers from the lower-dimensional puzzle have been removed and the stickers have been replaced with pieces. The middle puzzles represent the layers of the puzzle along the new dimension, and the caps represent the two new facets added along this direction. The layout was inspired by Don Hatch's layout in [MagicCubeNdSolve](http://www.plunk.org/~hatch/MagicCubeNdSolve/).
+The projection is recursive in the number of dimensions. When a dimension is added, multiple copies of the previous dimension's puzzle are placed next to each other, along with a cap on either end. In each cap, the stickers from the lower-dimensional puzzle have been removed and the stickers have been replaced with pieces. The middle puzzles represent the layers of the puzzle along the new dimension, and the caps represent the two new facets added along this direction. The layout was inspired by Don Hatch's layout in [MagicCubeNdSolve](http://www.plunk.org/~hatch/MagicCubeNdSolve/).
 
 ### Use
 
-To start the program, download it from [releases](https://github.com/milojacquet/flat-hypercube/releases/latest) and run it with the arguments `[n] [d]` to produce an `n^d` puzzle. Use `--compact` to move the stickers closer to each other, which can help on smaller screens.
+To start the program, run it with the arguments `[n] [d]` to produce an `n^d` puzzle. Use `--compact` or `-c` to move the stickers closer to each other, which can help on smaller screens. You can pan the viewport by dragging with the mouse, using arrow keys, or scrolling with the touchpad.
 
 This program supports multiple methods of interaction. In all modes, pressing <kbd>=</kbd> 5 times scrambles the puzzle, and pressing <kbd>-</kbd> 5 times resets the puzzle. <kbd>Ctrl</kbd>+<kbd>C</kbd> quits the program. <kbd>Z</kbd> undoes the most recent move, and <kbd>Shift</kbd>+<kbd>Z</kbd> redoes it. 
 
 There are multiple systems to turn the puzzle. <kbd>\\</kbd> cycles between them. In all of them, using <kbd>1</kbd> through <kbd>9</kbd> before a turn sequence selects the layer of the puzzle starting from the outermost.
 
-Each side has several keys that can be used to access it in different contexts. The selector is usually used at the beginning of the key combination to select which side to turn. The other set of keys is used to determine which direction the side should turn. When in axis mode, these keys only refer to the positive direction on each axis, and when in side mode, there are keys for both sides. Axis mode and side mode can be toggled with <kbd>Shift</kbd>+<kbd>\\</kbd>. 
+Each side has several keys that can be used to access it in different contexts. The selector is usually used at the beginning of the key combination to select which side to turn. The other set of keys is used to determine which direction the side should turn. When in axis mode, these keys only refer to the positive direction on each axis, and when in side mode, there are keys for both sides. Axis mode and side mode can be toggled with <kbd>Shift</kbd>+<kbd>\\</kbd>. The table below shows the default keybindings provided by `default_prefs.json`; custom prefs files can define different keys and additional axes.
+
 | Side (+/-) | Selector | Axis mode | Side mode |
 | -------- | ------- | ------- | ------- |
 | R, L | <kbd>F</kbd>, <kbd>S</kbd> | <kbd>K</kbd> | <kbd>L</kbd>, <kbd>U</kbd> |
