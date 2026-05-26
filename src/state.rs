@@ -30,28 +30,6 @@ const FRAME_LENGTH: Duration = Duration::from_millis(1000 / 30);
 
 static CTRL_C_PRESSED: AtomicBool = AtomicBool::new(false);
 
-#[cfg(windows)]
-unsafe extern "system" {
-    fn SetConsoleCtrlHandler(
-        handler: Option<unsafe extern "system" fn(u32) -> i32>,
-        add: i32,
-    ) -> i32;
-}
-
-#[cfg(windows)]
-unsafe extern "system" fn console_ctrl_handler(ctrl_type: u32) -> i32 {
-    const CTRL_C_EVENT: u32 = 0;
-    const CTRL_BREAK_EVENT: u32 = 1;
-    if ctrl_type == CTRL_C_EVENT || ctrl_type == CTRL_BREAK_EVENT {
-        if CTRL_C_PRESSED.swap(true, Ordering::SeqCst) {
-            return 0; // second Ctrl+C — let default handler terminate
-        }
-        1
-    } else {
-        0 // pass through for close/logoff events
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TurnLayer {
     Layer(i16),
@@ -942,10 +920,11 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
 
     let stdout_manager = StdoutManager;
 
-    #[cfg(windows)]
-    unsafe {
-        SetConsoleCtrlHandler(Some(console_ctrl_handler), 1);
-    }
+    ctrlc::set_handler(move || {
+        if CTRL_C_PRESSED.swap(true, Ordering::SeqCst) {
+            std::process::exit(0); // second Ctrl+C — terminate immediately
+        }
+    })?;
 
     const SCROLL_STEP_WHEEL: i16 = 3;
 
