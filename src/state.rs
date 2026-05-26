@@ -387,7 +387,6 @@ impl AppState {
                         }
                     } else if c == self.prefs.global_keys.undo {
                         self.flush_modes();
-                        self.rev_stack.clear();
                         let undid = self.undo_history.pop();
                         match undid {
                             None => {
@@ -395,12 +394,12 @@ impl AppState {
                             }
                             Some(undid) => {
                                 self.puzzle.turn(undid.inverse());
-                                self.redo_history.push(undid)
+                                self.redo_history.push(undid);
+                                self.rev_stack_adjust();
                             }
                         }
                     } else if c == self.prefs.global_keys.redo {
                         self.flush_modes();
-                        self.rev_stack.clear();
                         let redid = self.redo_history.pop();
                         match redid {
                             None => {
@@ -408,7 +407,8 @@ impl AppState {
                             }
                             Some(redid) => {
                                 self.puzzle.turn(redid.clone());
-                                self.undo_history.push(redid)
+                                self.undo_history.push(redid);
+                                self.rev_stack_adjust();
                             }
                         }
                     } else if c == self.prefs.global_keys.next_filter {
@@ -770,11 +770,14 @@ impl AppState {
             }
         }
 
-        self.undo_history.push(turn.clone());
+        let turn_clone = turn.clone();
         let turn_out = self.puzzle.turn(turn);
 
-        if turn_out.is_some() && self.puzzle.is_solved() {
-            self.message = Some("solved!".to_string());
+        if turn_out.is_some() {
+            self.undo_history.push(turn_clone);
+            if self.puzzle.is_solved() {
+                self.message = Some("solved!".to_string());
+            }
         }
 
         turn_out
@@ -884,6 +887,28 @@ impl AppState {
             s.push_str(&(self.undo_history.len() - pos).to_string());
         }
         s
+    }
+
+    fn rev_stack_adjust(&mut self) {
+        let len = self.undo_history.len();
+        self.rev_stack.retain_mut(|entry| {
+            if entry.start > len {
+                if entry.end.is_none() {
+                    entry.start = len;
+                } else {
+                    return false;
+                }
+            }
+            if let Some(ref mut end) = entry.end {
+                if *end > len {
+                    *end = len;
+                }
+                if *end == entry.start {
+                    return false;
+                }
+            }
+            true
+        });
     }
 }
 
