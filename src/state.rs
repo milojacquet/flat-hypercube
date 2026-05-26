@@ -171,6 +171,13 @@ pub struct AppState {
     pub clicked: Vec<Vec<i16>>,
     pub filename: PathBuf,
     pub prefs: Prefs,
+    pub rev_stack: Vec<RevEntry>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RevEntry {
+    pub start: usize,
+    pub end: Option<usize>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -235,6 +242,7 @@ impl AppState {
             clicked: Vec::new(),
             filename: Self::new_filename(),
             prefs,
+            rev_stack: vec![],
         })
     }
 
@@ -334,12 +342,14 @@ impl AppState {
                     self.scramble = self.puzzle.clone();
                     self.undo_history = vec![];
                     self.redo_history = vec![];
+                    self.rev_stack.clear();
                 } else if ch == self.prefs.global_keys.reset {
                     self.puzzle = Puzzle::make_solved(self.puzzle.n, self.puzzle.d);
                     self.message = Some("puzzle reset".to_string());
                     self.scramble = self.puzzle.clone();
                     self.undo_history = vec![];
                     self.redo_history = vec![];
+                    self.rev_stack.clear();
                 }
                 self.damage_counter = None;
             }
@@ -377,6 +387,7 @@ impl AppState {
                         }
                     } else if c == self.prefs.global_keys.undo {
                         self.flush_modes();
+                        self.rev_stack.clear();
                         let undid = self.undo_history.pop();
                         match undid {
                             None => {
@@ -389,6 +400,7 @@ impl AppState {
                         }
                     } else if c == self.prefs.global_keys.redo {
                         self.flush_modes();
+                        self.rev_stack.clear();
                         let redid = self.redo_history.pop();
                         match redid {
                             None => {
@@ -799,6 +811,80 @@ impl AppState {
         }
         out
     }
+
+    fn rev_start(&mut self) {
+        self.rev_stack.push(RevEntry {
+            start: self.undo_history.len(),
+            end: None,
+        });
+    }
+
+    fn rev_stop(&mut self) {
+        if let Some(top) = self.rev_stack.last() {
+            if top.end.is_some() || self.undo_history.len() <= top.start {
+                self.rev_stack.pop();
+            } else {
+                self.rev_stack.last_mut().unwrap().end = Some(self.undo_history.len());
+            }
+        }
+    }
+
+    fn apply_reverse(&mut self, from: usize, to: usize) {
+        let turns: Vec<Turn> = self.undo_history[from..to]
+            .iter()
+            .rev()
+            .cloned()
+            .collect();
+        for turn in turns {
+            let inverse = turn.inverse();
+            self.puzzle.turn(inverse.clone());
+            self.undo_history.push(inverse);
+        }
+    }
+
+    fn rev_unwind(&mut self) {
+        if let Some(entry) = self.rev_stack.pop() {
+            if let Some(r) = entry.end {
+                if self.undo_history.len() >= r {
+                    self.apply_reverse(entry.start, r);
+                }
+            }
+        }
+    }
+
+    fn rev_commutator(&mut self) {
+        if let Some(entry) = self.rev_stack.pop() {
+            if let Some(r) = entry.end {
+                let p = self.undo_history.len();
+                if p >= r {
+                    self.apply_reverse(entry.start, r);
+                    self.apply_reverse(r, p);
+                }
+            }
+        }
+    }
+
+    fn rev_stack_display(&self) -> String {
+        let mut s = String::new();
+        let mut pos = 0usize;
+        for entry in &self.rev_stack {
+            if entry.start > pos {
+                s.push_str(&(entry.start - pos).to_string());
+            }
+            s.push('[');
+            if let Some(end) = entry.end {
+                s.push_str(&(end - entry.start).to_string());
+                s.push(']');
+                pos = end;
+            } else {
+                pos = entry.start;
+            }
+        }
+        if pos < self.undo_history.len() {
+            s.push_str(&(self.undo_history.len() - pos).to_string());
+        }
+        s
+    }
 }
 
 fn draw_brackets(
@@ -938,6 +1024,7 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
 
     'event: loop {
         let previous_message = state.get_message();
+        let previous_rev_stack = state.rev_stack_display();
         let previous_hovered = state.hovered;
         let previous_clicked_stickers = state.clicked_stickers();
         let mut just_resized = false;
@@ -956,6 +1043,10 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                     KeyCode::Char('c') if modifiers.contains(KeyModifiers::CONTROL) => {
                         break 'event;
                     }
+                    KeyCode::F(1) => state.rev_start(),
+                    KeyCode::F(2) => state.rev_stop(),
+                    KeyCode::F(3) => state.rev_unwind(),
+                    KeyCode::F(4) => state.rev_commutator(),
                     KeyCode::Char(c) => {
                         state.process_key(c);
                     }
@@ -972,15 +1063,15 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                         state.process_key(BACKSPACE_CODE);
                     }
                     KeyCode::Up => {
-                        let step = (term_h.saturating_sub(1) as i16 * 3 / 4).max(1);
+                        let step = (term_h.saturating_sub(2) as i16 * 3 / 4).max(1);
                         scroll_y = (scroll_y - step).max(0);
                     }
                     KeyCode::Down => {
-                        let step = (term_h.saturating_sub(1) as i16 * 3 / 4).max(1);
+                        let step = (term_h.saturating_sub(2) as i16 * 3 / 4).max(1);
                         scroll_y = (scroll_y + step).min(
                             layout
                                 .height
-                                .saturating_sub(term_h.saturating_sub(1))
+                                .saturating_sub(term_h.saturating_sub(2))
                                 as i16,
                         );
                     }
@@ -1019,7 +1110,7 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                                 scroll_y = (scroll_y + SCROLL_STEP_WHEEL).min(
                                     layout
                                         .height
-                                        .saturating_sub(term_h.saturating_sub(1))
+                                        .saturating_sub(term_h.saturating_sub(2))
                                         as i16,
                                 );
                             }
@@ -1044,7 +1135,7 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                                     0,
                                     layout
                                         .height
-                                        .saturating_sub(term_h.saturating_sub(1))
+                                        .saturating_sub(term_h.saturating_sub(2))
                                         as i16,
                                 );
                             }
@@ -1103,7 +1194,7 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                     scroll_y = scroll_y.min(
                         layout
                             .height
-                            .saturating_sub(term_h.saturating_sub(1))
+                            .saturating_sub(term_h.saturating_sub(2))
                             as i16,
                     );
                     stdout.execute(terminal::Clear(terminal::ClearType::All))?;
@@ -1123,12 +1214,24 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         let message = state.get_message();
+        let rev_stack_display = state.rev_stack_display();
 
         if just_resized {
             stdout
-                .queue(cursor::MoveTo(0, term_h.saturating_sub(1)))?
+                .queue(cursor::MoveTo(0, term_h.saturating_sub(2)))?
                 .queue(terminal::Clear(terminal::ClearType::All))?
                 .flush()?;
+        }
+        if previous_rev_stack != rev_stack_display || scrolled || just_resized {
+            stdout
+                .queue(cursor::MoveTo(0, term_h.saturating_sub(2)))?
+                .queue(terminal::Clear(terminal::ClearType::CurrentLine))?;
+            if !rev_stack_display.is_empty() {
+                stdout.queue(style::Print(&format!(
+                    "RevStack: {}",
+                    rev_stack_display
+                )))?;
+            }
         }
         if previous_message != message || scrolled || just_resized {
             stdout
@@ -1164,7 +1267,7 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
             if screen_x < 0
                 || screen_x >= term_w as i16
                 || screen_y < 0
-                || screen_y >= term_h.saturating_sub(1) as i16
+                || screen_y >= term_h.saturating_sub(2) as i16
             {
                 continue;
             }
@@ -1247,7 +1350,7 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
             if screen_x < 0
                 || screen_x >= term_w as i16
                 || screen_y < 0
-                || screen_y >= term_h.saturating_sub(1) as i16
+                || screen_y >= term_h.saturating_sub(2) as i16
             {
                 continue;
             }
