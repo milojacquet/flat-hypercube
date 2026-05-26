@@ -953,6 +953,9 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
     let mut scroll_x: i16 = 0;
     let mut scroll_y: i16 = 0;
     let mut prev_mouse_pos: Option<(u16, u16)> = None;
+    let mut dragged = false;
+    let mut last_empty_click: Option<Instant> = None;
+    const DOUBLE_CLICK_THRESHOLD: Duration = Duration::from_millis(500);
 
     'event: loop {
         let previous_message = state.get_message();
@@ -1067,38 +1070,49 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                                 );
                             }
                             prev_mouse_pos = Some((column, row));
+                            dragged = true;
                             continue;
                         }
                         MouseEventKind::Up(_) => {
                             prev_mouse_pos = None;
-                            continue;
+                            if std::mem::replace(&mut dragged, false) {
+                                continue;
+                            }
                         }
                         MouseEventKind::Down(_) => {
                             prev_mouse_pos = Some((column, row));
+                            dragged = false;
+                            continue;
                         }
                         _ => {}
                     }
                     let key = (column as i16 + scroll_x, row as i16 + scroll_y);
                     let sticker = layout.points.get(&key);
                     if let Some(sticker) = sticker {
-                        match kind {
-                            MouseEventKind::Down(_button) => {
-                                let original_length = state.clicked.len();
-                                state.clicked.retain(|st| {
-                                    st.iter()
-                                        .zip(sticker.iter())
-                                        .any(|(a, b)| (a - b).abs() > 1)
-                                });
+                        if let MouseEventKind::Up(_) = kind {
+                            let original_length = state.clicked.len();
+                            state.clicked.retain(|st| {
+                                st.iter()
+                                    .zip(sticker.iter())
+                                    .any(|(a, b)| (a - b).abs() > 1)
+                            });
 
-                                if original_length == state.clicked.len() {
-                                    state.clicked.push(sticker.clone());
-                                }
+                            if original_length == state.clicked.len() {
+                                state.clicked.push(sticker.clone());
                             }
-                            MouseEventKind::Moved => {
-                                state.hovered = Some(key);
-                            }
-                            _ => {}
                         }
+                    } else if let MouseEventKind::Up(_) = kind {
+                        if let Some(prev) = last_empty_click
+                            && prev.elapsed() < DOUBLE_CLICK_THRESHOLD
+                        {
+                            state.clicked.clear();
+                            last_empty_click = None;
+                        } else {
+                            last_empty_click = Some(Instant::now());
+                        }
+                    }
+                    if let MouseEventKind::Moved = kind {
+                        state.hovered = sticker.map(|_| key);
                     }
                 }
                 Event::Resize(_, _) => {
