@@ -438,7 +438,8 @@ impl AppState {
                         self.flush_modes();
                         self.current_keys.push(c);
                         self.current_turn.layer = Some(TurnLayer::Layer(s as i16));
-                    } else if !self.awaiting_side_as_axis()
+                    } else if self.current_turn.layer != Some(TurnLayer::WholePuzzle)
+                        && !self.awaiting_side_as_axis()
                         && let Some(s) = self.get_side(c)
                         && !(self.current_turn.side.is_some() && self.get_axis_key(c).is_some())
                     {
@@ -452,12 +453,10 @@ impl AppState {
                         self.current_turn.side = Some(s);
                         just_pressed_side = true;
                     } else if c == self.prefs.global_keys.rotate {
-                        if self.keybind_set == KeybindSet::ThreeKey {
-                            self.flush_modes();
-                            just_pressed_side = true;
-                        }
+                        self.flush_modes();
                         self.current_keys.push(c);
                         self.current_turn.layer = Some(TurnLayer::WholePuzzle);
+                        just_pressed_side = true;
                     }
 
                     match self.keybind_set {
@@ -478,7 +477,6 @@ impl AppState {
                                 if ax(s) as u16 >= self.puzzle.d {
                                     return;
                                 }
-                                self.current_keys.push(c);
 
                                 let side = if self.current_turn.side.is_some() {
                                     self.current_turn.side
@@ -489,8 +487,18 @@ impl AppState {
                                 };
 
                                 if let Some(side) = side {
-                                    if let Some(from) = self.current_turn.from {
-                                        let turn_out = self.perform_turn(side, from, s);
+                                    if self.current_turn.from.is_none() {
+                                        self.current_keys = self.base_keys();
+                                    }
+                                    self.current_keys.push(c);
+
+                                    if let Some(from_raw) = self.current_turn.from {
+                                        let (from_norm, to_norm) = if self.current_turn.layer == Some(TurnLayer::WholePuzzle) {
+                                            (ax(from_raw), ax(s))
+                                        } else {
+                                            (from_raw, s)
+                                        };
+                                        let turn_out = self.perform_turn(side, from_norm, to_norm);
 
                                         if turn_out.is_none() {
                                             self.alert = self.prefs.alert_frames * 4 - 1;
@@ -498,10 +506,12 @@ impl AppState {
                                             self.current_keys = self.current_keys
                                                 [..self.current_keys.len() - key_removal]
                                                 .to_string();
+                                        } else {
+                                            self.current_keys = self.canonical_turn_keys(from_raw, s);
                                         }
                                         self.current_turn.from = None;
                                         if strict {
-                                            self.current_turn.side = None;
+                                            self.current_turn = Default::default();
                                         }
                                     } else {
                                         self.current_turn.from = Some(s);
@@ -547,17 +557,17 @@ impl AppState {
 
                             if let (Some(side), true) = (self.current_turn.side, just_pressed_side)
                             {
-                                if flip {
+                                let _turn_out = if flip {
                                     if side < 0 {
-                                        self.perform_turn(side, (!side + 1) % 3, (!side + 2) % 3);
+                                        self.perform_turn(side, (!side + 1) % 3, (!side + 2) % 3)
                                     } else {
-                                        self.perform_turn(side, (side + 2) % 3, (side + 1) % 3);
+                                        self.perform_turn(side, (side + 2) % 3, (side + 1) % 3)
                                     }
                                 } else if side < 0 {
-                                    self.perform_turn(side, (!side + 2) % 3, (!side + 1) % 3);
+                                    self.perform_turn(side, (!side + 2) % 3, (!side + 1) % 3)
                                 } else {
-                                    self.perform_turn(side, (side + 1) % 3, (side + 2) % 3);
-                                }
+                                    self.perform_turn(side, (side + 1) % 3, (side + 2) % 3)
+                                };
                             }
                         }
                         KeybindSet::FixedKey => {
@@ -568,13 +578,34 @@ impl AppState {
                                 if ax(s) as u16 >= self.puzzle.d {
                                     return;
                                 }
+                                if self.current_turn.fixed.is_empty() {
+                                    self.current_keys = self.base_keys();
+                                }
                                 self.current_keys.push(c);
                                 self.current_turn.fixed.push(s);
 
-                                if let Some(side) = self.current_turn.side {
-                                    if self.current_turn.fixed.len() == self.puzzle.d as usize - 3 {
+                                let whole_puzzle =
+                                    self.current_turn.layer == Some(TurnLayer::WholePuzzle);
+                                let required_fixed = if whole_puzzle {
+                                    self.puzzle.d as usize - 2
+                                } else {
+                                    self.puzzle.d as usize - 3
+                                };
+
+                                let side = if whole_puzzle {
+                                    None
+                                } else {
+                                    self.current_turn.side
+                                };
+
+                                if side.is_some() || whole_puzzle {
+                                    if self.current_turn.fixed.len() == required_fixed {
                                         let mut sign = true;
-                                        let mut axes = vec![side];
+                                        let mut axes = if let Some(side) = side {
+                                            vec![side]
+                                        } else {
+                                            vec![]
+                                        };
                                         axes.extend(self.current_turn.fixed.iter().cloned());
 
                                         for axis in &mut axes {
@@ -583,7 +614,6 @@ impl AppState {
                                                 *axis = !*axis;
                                             }
                                         }
-                                        //self.message = format!("{:?}", axes).into();
 
                                         for axis in 0..self.puzzle.d as i16 {
                                             if !axes.contains(&axis) {
@@ -611,7 +641,11 @@ impl AppState {
                                             if !sign {
                                                 std::mem::swap(&mut from, &mut to);
                                             }
-                                            self.perform_turn(side, from, to)
+                                            self.perform_turn(
+                                                side.unwrap_or(0),
+                                                from,
+                                                to,
+                                            )
                                         });
 
                                         if turn_out.is_none() {
@@ -704,6 +738,62 @@ impl AppState {
             }),
         }
         .map(|s| s as i16)
+    }
+
+    fn base_keys(&self) -> String {
+        let mut s = String::new();
+        if let Some(TurnLayer::Layer(l)) = self.current_turn.layer {
+            if let Some(&ch) = self.prefs.global_keys.layers.get(l as usize) {
+                s.push(ch);
+            }
+        } else if self.current_turn.layer == Some(TurnLayer::WholePuzzle) {
+            s.push(self.prefs.global_keys.rotate);
+            return s;
+        }
+        if let Some(side) = self.current_turn.side {
+            if side >= 0 {
+                if let Some(axis) = self.prefs.axes.get(side as usize) {
+                    s.push(axis.pos.keys.select);
+                }
+            } else if let Some(axis) = self.prefs.axes.get((!side) as usize) {
+                s.push(axis.neg.keys.select);
+            }
+        }
+        s
+    }
+
+    fn axis_key_char(&self, axis: i16) -> Option<char> {
+        if self.keybind_set == KeybindSet::ThreeKeyStrict {
+            if axis >= 0 {
+                self.prefs.axes.get(axis as usize).map(|ax| ax.pos.keys.select)
+            } else {
+                self.prefs.axes.get((!axis) as usize).map(|ax| ax.neg.keys.select)
+            }
+        } else {
+            match self.keybind_axial {
+                KeybindAxial::Axial => {
+                    self.prefs.axes.get(ax(axis) as usize).map(|ax| ax.axis_key)
+                }
+                KeybindAxial::Side => {
+                    if axis >= 0 {
+                        self.prefs.axes.get(axis as usize).map(|ax| ax.pos.keys.side)
+                    } else {
+                        self.prefs.axes.get((!axis) as usize).map(|ax| ax.neg.keys.side)
+                    }
+                }
+            }
+        }
+    }
+
+    fn canonical_turn_keys(&self, from: i16, to: i16) -> String {
+        let mut s = self.base_keys();
+        if let Some(ch) = self.axis_key_char(from) {
+            s.push(ch);
+        }
+        if let Some(ch) = self.axis_key_char(to) {
+            s.push(ch);
+        }
+        s
     }
 
     fn perform_turn(&mut self, side: i16, from: i16, to: i16) -> Option<()> {
@@ -1383,8 +1473,11 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
             let ch;
             let color;
             if let Some(side) = side {
-                ch = if state.current_turn.side.is_none()
-                    || (state.keybind_set == KeybindSet::FixedKey && state.puzzle.d == 3)
+                ch = if (state.current_turn.side.is_none()
+                        && state.current_turn.layer != Some(TurnLayer::WholePuzzle))
+                    || (state.keybind_set == KeybindSet::FixedKey
+                        && state.puzzle.d == 3
+                        && state.current_turn.layer != Some(TurnLayer::WholePuzzle))
                     || state.keybind_set == KeybindSet::ThreeKeyStrict
                 {
                     if *side >= 0 {

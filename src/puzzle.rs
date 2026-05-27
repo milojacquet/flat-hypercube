@@ -184,7 +184,9 @@ impl Puzzle {
 
     fn puzzle_rotate(&mut self, turn: PuzzleTurn) -> Option<()> {
         let PuzzleTurn { from, to } = turn;
-        if from == to || from == !to {
+        let from = ax(from);
+        let to = ax(to);
+        if from == to {
             return None;
         }
 
