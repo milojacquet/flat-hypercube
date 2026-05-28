@@ -329,6 +329,8 @@ impl AppState {
         self.keybind_set == KeybindSet::ThreeKeyStrict && self.current_turn.side.is_some()
     }
 
+    // Handle global mode keys, layer select, side select, and rotate (x).
+    // Returns true if the key was consumed and should not be processed further.
     fn handle_prefix_keys(&mut self, c: char) -> bool {
         if c == self.prefs.global_keys.keybind_mode {
             self.flush_modes();
@@ -427,6 +429,9 @@ impl AppState {
         false
     }
 
+    // Process an axis key in ThreeKey or ThreeKeyStrict mode.
+    // The first axis key sets `from`; the second completes a turn via perform_turn.
+    // Whole-puzzle (x) rotations swap from/to when axis keys have opposite signs.
     fn try_three_key(&mut self, c: char) {
         let strict = self.keybind_set == KeybindSet::ThreeKeyStrict;
         let axis = if strict {
@@ -488,6 +493,8 @@ impl AppState {
         }
     }
 
+    // Process a side key in FixedKey mode for 3D puzzles.
+    // A single side key fully defines the rotation (no axis keys needed).
     fn try_fixed_3d(&mut self, c: char) {
         let (axis, flip) =
             if let Some(s) = self.prefs.axes.iter().position(|ax| ax.pos.keys.side == c) {
@@ -526,6 +533,9 @@ impl AppState {
         }
     }
 
+    // Process an axis key in FixedKey mode for d > 3.
+    // Accumulates axes in `fixed` until d-3 (or d-2 for whole-puzzle) are collected,
+    // then resolves the rotation plane and direction via permutation parity.
     fn try_fixed_key(&mut self, c: char) {
         let Some(kp) = self.get_axis_key(c) else { return };
         if ax(kp.axis) as u16 >= self.puzzle.d {
@@ -617,6 +627,9 @@ impl AppState {
         layout
     }
 
+    // Main key dispatch. Handles damage-counter keys (scramble/reset),
+    // global mode keys, then delegates to handle_prefix_keys and the
+    // mode-specific try_* methods for turn input.
     pub fn process_key(&mut self, c: char) {
         self.message = None;
         if c == self.prefs.global_keys.scramble || c == self.prefs.global_keys.reset {
@@ -748,6 +761,9 @@ impl AppState {
         }
     }
 
+    // Look up c as an axis/side key (not a select key). In side mode
+    // negative sides are encoded as bitwise NOT (!s) to distinguish them
+    // from positive sides while preserving the axis index via ax().
     fn get_axis_key(&self, c: char) -> Option<KeyPress> {
         if self.keybind_set == KeybindSet::ThreeKeyStrict {
             return None;
@@ -770,6 +786,9 @@ impl AppState {
         }
     }
 
+    // Execute a puzzle turn. Reads self.current_turn.layer to decide whether
+    // this is a whole-puzzle rotation (PuzzleTurn) or a layer turn (SideTurn).
+    // Returns None if the turn is invalid (e.g. degenerate plane).
     fn perform_turn(&mut self, side: i16, from: i16, to: i16) -> Option<()> {
         let mut layer_min;
         let mut layer_max;
@@ -863,6 +882,8 @@ impl AppState {
         }
     }
 
+    // Collect all sticker positions that should display click brackets.
+    // Includes the clicked piece body and adjacent stickers on each axis.
     fn clicked_stickers(&self) -> HashMap<Vec<i16>, ClickedStyle> {
         let mut out = HashMap::new();
         for clicked in &self.clicked {
@@ -885,6 +906,7 @@ impl AppState {
         out
     }
 
+    // Begin a reversion block — subsequent turns are grouped for F3/F4 undo.
     fn rev_start(&mut self) {
         self.rev_stack.push(RevEntry {
             start: self.undo_history.len(),
@@ -959,6 +981,8 @@ impl AppState {
         s
     }
 
+    // After undo/redo, shift rev-stack indices so they stay valid relative
+    // to the new undo_history length.
     fn rev_stack_adjust(&mut self) {
         let len = self.undo_history.len();
         self.rev_stack.retain_mut(|entry| {
@@ -1063,6 +1087,9 @@ struct Args {
     prefs: Option<PathBuf>,
 }
 
+// Main event loop: set up terminal, poll for input events, render the puzzle
+// each frame. Rendering order is hovered brackets → puzzle points → clicked
+// brackets → keybind hints, so later layers paint over earlier ones.
 pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     let prefs: Prefs = if let Some(path) = args.prefs {
