@@ -1112,6 +1112,8 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
     const SCROLL_STEP_WHEEL: i16 = 3;
 
     let (mut term_w, mut term_h) = terminal::size()?;
+    let mut scroll_max_x = layout.width.saturating_sub(term_w) as i16;
+    let mut scroll_max_y = layout.height.saturating_sub(term_h.saturating_sub(2)) as i16;
     let mut scroll_x: i16 = 0;
     let mut scroll_y: i16 = 0;
     let mut prev_mouse_pos: Option<(u16, u16)> = None;
@@ -1165,12 +1167,7 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     KeyCode::Down => {
                         let step = (term_h.saturating_sub(2) as i16 * 3 / 4).max(1);
-                        scroll_y = (scroll_y + step).min(
-                            layout
-                                .height
-                                .saturating_sub(term_h.saturating_sub(2))
-                                as i16,
-                        );
+                        scroll_y = (scroll_y + step).min(scroll_max_y);
                     }
                     KeyCode::Left => {
                         let step = (term_w as i16 * 3 / 4).max(1);
@@ -1178,8 +1175,7 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     KeyCode::Right => {
                         let step = (term_w as i16 * 3 / 4).max(1);
-                        scroll_x = (scroll_x + step)
-                            .min(layout.width.saturating_sub(term_w) as i16);
+                        scroll_x = (scroll_x + step).min(scroll_max_x);
                     }
                     _ => (),
                 },
@@ -1201,15 +1197,9 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                         }
                         MouseEventKind::ScrollDown => {
                             if modifiers.contains(KeyModifiers::SHIFT) {
-                                scroll_x = (scroll_x + SCROLL_STEP_WHEEL)
-                                    .min(layout.width.saturating_sub(term_w) as i16);
+                                scroll_x = (scroll_x + SCROLL_STEP_WHEEL).min(scroll_max_x);
                             } else {
-                                scroll_y = (scroll_y + SCROLL_STEP_WHEEL).min(
-                                    layout
-                                        .height
-                                        .saturating_sub(term_h.saturating_sub(2))
-                                        as i16,
-                                );
+                                scroll_y = (scroll_y + SCROLL_STEP_WHEEL).min(scroll_max_y);
                             }
                             continue;
                         }
@@ -1218,23 +1208,15 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                             continue;
                         }
                         MouseEventKind::ScrollRight => {
-                            scroll_x = (scroll_x + SCROLL_STEP_WHEEL)
-                                .min(layout.width.saturating_sub(term_w) as i16);
+                            scroll_x = (scroll_x + SCROLL_STEP_WHEEL).min(scroll_max_x);
                             continue;
                         }
                         MouseEventKind::Drag(_) => {
                             if let Some((prev_col, prev_row)) = prev_mouse_pos {
                                 let dx = prev_col as i16 - column as i16;
                                 let dy = prev_row as i16 - row as i16;
-                                scroll_x = (scroll_x + dx)
-                                    .clamp(0, layout.width.saturating_sub(term_w) as i16);
-                                scroll_y = (scroll_y + dy).clamp(
-                                    0,
-                                    layout
-                                        .height
-                                        .saturating_sub(term_h.saturating_sub(2))
-                                        as i16,
-                                );
+                                scroll_x = (scroll_x + dx).clamp(0, scroll_max_x);
+                                scroll_y = (scroll_y + dy).clamp(0, scroll_max_y);
                             }
                             prev_mouse_pos = Some((column, row));
                             dragged = true;
@@ -1286,14 +1268,10 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                     let (new_w, new_h) = terminal::size()?;
                     term_w = new_w;
                     term_h = new_h;
-                    scroll_x =
-                        scroll_x.min(layout.width.saturating_sub(term_w) as i16);
-                    scroll_y = scroll_y.min(
-                        layout
-                            .height
-                            .saturating_sub(term_h.saturating_sub(2))
-                            as i16,
-                    );
+                    scroll_max_x = layout.width.saturating_sub(term_w) as i16;
+                    scroll_max_y = layout.height.saturating_sub(term_h.saturating_sub(2)) as i16;
+                    scroll_x = scroll_x.min(scroll_max_x);
+                    scroll_y = scroll_y.min(scroll_max_y);
                     stdout.execute(terminal::Clear(terminal::ClearType::All))?;
                     just_resized = true;
                 }
