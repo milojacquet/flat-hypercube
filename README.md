@@ -8,7 +8,7 @@ The projection is recursive in the number of dimensions. When a dimension is add
 
 To start the program, run it with the arguments `[n] [d]` to produce an `n^d` puzzle. Use `--compact` or `-c` to move the stickers closer to each other, which can help on smaller screens. You can pan the viewport by dragging with the mouse, using arrow keys, or scrolling with the touchpad.
 
-This program supports multiple methods of interaction. In all modes, pressing <kbd>=</kbd> 5 times scrambles the puzzle, and pressing <kbd>-</kbd> 5 times resets the puzzle. <kbd>Ctrl</kbd>+<kbd>C</kbd> quits the program. <kbd>Z</kbd> undoes the most recent move, and <kbd>Shift</kbd>+<kbd>Z</kbd> redoes it. 
+This program supports multiple methods of interaction. In all modes, pressing <kbd>=</kbd> 5 times scrambles the puzzle, and pressing <kbd>-</kbd> 5 times resets the puzzle. <kbd>Ctrl</kbd>+<kbd>C</kbd> quits the program (press twice for forced quit). <kbd>Z</kbd> undoes the most recent move, and <kbd>Shift</kbd>+<kbd>Z</kbd> redoes it.
 
 There are multiple systems to turn the puzzle. <kbd>\\</kbd> cycles between them. In all of them, using <kbd>1</kbd> through <kbd>9</kbd> before a turn sequence selects the layer of the puzzle starting from the outermost.
 
@@ -31,11 +31,28 @@ Each side has several keys that can be used to access it in different contexts. 
 
 This mode is most similar to Magic Cube 7D. To make a turn, first use the side selector, then two axis keys to perform the turn that takes the first axis to the second axis. If you use <kbd>X</kbd> instead of the side selector, you can do a whole-puzzle rotation. Once you complete a move, you can continue to use axis keys to do additional moves on the same side.
 
+**Three-key strict mode** requires every key in the sequence to be a selector key — no axis keys or side keys are used. After each turn the state is fully reset; layer selections and `x` do not persist between turns.
+
+In **side mode**, whole-puzzle rotations respect the sign of each axis key: pressing a positive side key for one axis and a negative side key for the other produces the inverse rotation of pressing both positive.
+
 #### Fixed-key mode
 
-In this mode, first use the side selector, then use enough axis keys to fix the rotation to occur in a plane. Once you complete a move, you can continue to use axis keys to do additional moves on the same side. To do a whole-puzzle rotation, include <kbd>X</kbd> somewhere in the sequence before the end. Once you complete a move, you can continue to use axis keys to do additional moves on the same side.
+In this mode, first use the side selector, then use enough axis keys to fix the rotation to occur in a plane. Once you complete a move, you can continue to use axis keys to do additional moves on the same side. For a whole-puzzle rotation, press <kbd>X</kbd> as the first key in the sequence — it replaces the side selector and requires one additional axis key (d−2 total instead of d−3).
 
 In three dimensions, just pressing a side selector key rotates that side counterclockwise. To rotate it clockwise, use the corresponding face selector key from side mode.
+
+### Commutators and conjugators
+
+<kbd>F1</kbd> starts a reversion block and <kbd>F2</kbd> ends it. The block is displayed on the second-to-last row as `RevStack: [n]` where `n` is the number of moves in the block.
+
+- <kbd>F3</kbd> performs an **undo** of the block: applies the inverse of each move in reverse order.
+- <kbd>F4</kbd> performs a **commutator**: applies the inverse of the block, then the inverse of all moves after the block. This is equivalent to undoing the moves before the block, performing them, then undoing everything — useful for checking commutativity.
+
+The RevStack display adapts automatically when you undo or redo moves that cross block boundaries.
+
+### Marking stickers
+
+Click a sticker to mark it and its neighboring stickers with brackets. The marking happens on mouse **release**, so you can drag to pan without accidentally marking. Double-click on empty space to clear all marks.
 
 ### Saving and loading
 
