@@ -612,7 +612,9 @@ impl AppState {
     }
 
     pub fn make_layout(&self, semi_compact: bool, compact: bool, vertical: bool) -> Layout {
-        Layout::make_layout(self.puzzle.n, self.puzzle.d, semi_compact, compact, vertical).move_right(1)
+        let mut layout = Layout::make_layout(self.puzzle.n, self.puzzle.d, semi_compact, compact, vertical).move_right(1);
+        layout.width += 1; // reserve rightmost column for brackets
+        layout
     }
 
     pub fn process_key(&mut self, c: char) {
@@ -988,6 +990,7 @@ fn draw_brackets(
     prefs: &Prefs,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let color = prefs.global_colors.clicked;
+    let x = x.max(1);
     stdout
         .queue(cursor::MoveTo(x as u16 - 1, y as u16))?
         .queue(style::PrintStyledContent(style.open().with(color)))?
@@ -1001,6 +1004,7 @@ fn erase_brackets(
     x: i16,
     y: i16,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let x = x.max(1);
     stdout
         .queue(cursor::MoveTo(x as u16 - 1, y as u16))?
         .queue(style::Print(' '))?
@@ -1334,17 +1338,25 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         if let Some((x, y)) = previous_hovered {
-            erase_brackets(&mut stdout, x - scroll_x, y - scroll_y)?;
+            let sx = x - scroll_x;
+            let sy = y - scroll_y;
+            if sx >= 1 && (sx as u16) < term_w && sy >= 0 && (sy as u16) < term_h.saturating_sub(2) {
+                erase_brackets(&mut stdout, sx, sy)?;
+            }
         }
 
         if let Some((x, y)) = state.hovered {
-            draw_brackets(
-                &mut stdout,
-                x - scroll_x,
-                y - scroll_y,
-                ClickedStyle::Hovered,
-                &state.prefs,
-            )?;
+            let sx = x - scroll_x;
+            let sy = y - scroll_y;
+            if sx >= 1 && (sx as u16) < term_w && sy >= 0 && (sy as u16) < term_h.saturating_sub(2) {
+                draw_brackets(
+                    &mut stdout,
+                    sx,
+                    sy,
+                    ClickedStyle::Hovered,
+                    &state.prefs,
+                )?;
+            }
         }
 
         let clicked_stickers = state.clicked_stickers();
@@ -1428,12 +1440,16 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         for (x, y) in erase_locs {
-            erase_brackets(&mut stdout, x, y)?;
+            if x >= 1 && (x as u16) < term_w && y >= 0 && (y as u16) < term_h.saturating_sub(2) {
+                erase_brackets(&mut stdout, x, y)?;
+            }
         }
 
         for style in CLICKED_STYLES {
             for (x, y) in clicked_locs.get(style).expect("contains") {
-                draw_brackets(&mut stdout, *x, *y, *style, &state.prefs)?;
+                if *x >= 1 && (*x as u16) < term_w && *y >= 0 && (*y as u16) < term_h.saturating_sub(2) {
+                    draw_brackets(&mut stdout, *x, *y, *style, &state.prefs)?;
+                }
             }
         }
 
