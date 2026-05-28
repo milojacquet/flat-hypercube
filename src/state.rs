@@ -494,7 +494,12 @@ impl AppState {
 
                                     if let Some(from_raw) = self.current_turn.from {
                                         let (from_norm, to_norm) = if self.current_turn.layer == Some(TurnLayer::WholePuzzle) {
-                                            (ax(from_raw), ax(s))
+                                            let mut from_norm = ax(from_raw);
+                                            let mut to_norm = ax(s);
+                                            if (from_raw < 0) != (s < 0) {
+                                                std::mem::swap(&mut from_norm, &mut to_norm);
+                                            }
+                                            (from_norm, to_norm)
                                         } else {
                                             (from_raw, s)
                                         };
