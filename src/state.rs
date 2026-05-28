@@ -36,12 +36,42 @@ pub enum TurnLayer {
     WholePuzzle,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct KeyPress {
+    pub ch: char,
+    pub axis: i16,
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct TurnBuild {
     pub layer: Option<TurnLayer>,
-    pub side: Option<i16>,
-    pub from: Option<i16>,
-    pub fixed: Vec<i16>,
+    pub layer_char: Option<char>,
+    pub side: Option<KeyPress>,
+    pub from: Option<KeyPress>,
+    pub fixed: Vec<KeyPress>,
+}
+
+impl TurnBuild {
+    fn current_keys(&self) -> String {
+        let mut s = String::new();
+        if let Some(ch) = self.layer_char {
+            s.push(ch);
+        }
+        if let Some(kp) = &self.side {
+            s.push(kp.ch);
+        }
+        if let Some(kp) = &self.from {
+            s.push(kp.ch);
+        }
+        for kp in &self.fixed {
+            s.push(kp.ch);
+        }
+        s
+    }
+
+    fn clear(&mut self) {
+        *self = Default::default();
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -151,7 +181,7 @@ pub struct AppState {
     pub puzzle: Puzzle,
     pub scramble: Puzzle,
     pub mode: AppMode,
-    pub current_keys: String,
+    pub last_turn_keys: String,
     pub current_turn: TurnBuild,
     pub alert: u8,
     pub damage_counter: Option<(char, u8)>,
@@ -222,7 +252,7 @@ impl AppState {
             puzzle: Puzzle::make_solved(n, d),
             scramble: Puzzle::make_solved(n, d),
             mode: Default::default(),
-            current_keys: "".to_string(),
+            last_turn_keys: String::new(),
             current_turn: Default::default(),
             alert: Default::default(),
             damage_counter: Default::default(),
@@ -289,8 +319,8 @@ impl AppState {
     }
 
     fn flush_modes(&mut self) {
-        self.current_keys = "".to_string();
-        self.current_turn = Default::default();
+        self.current_turn.clear();
+        self.last_turn_keys.clear();
         self.live_filter_string = Default::default();
     }
 
@@ -299,18 +329,285 @@ impl AppState {
         self.keybind_set == KeybindSet::ThreeKeyStrict && self.current_turn.side.is_some()
     }
 
-    fn get_side(&self, c: char) -> Option<i16> {
+    fn handle_prefix_keys(&mut self, c: char) -> bool {
+        if c == self.prefs.global_keys.keybind_mode {
+            self.flush_modes();
+            self.keybind_set = self.keybind_set.next(self.puzzle.n);
+            self.message = Some(format!("set keybinds to {}", self.keybind_set.name()));
+            return true;
+        }
+        if c == self.prefs.global_keys.axis_mode {
+            if self.puzzle.d > 6 {
+                self.message = Some("not enough room for side keybinds".to_string());
+            } else {
+                self.flush_modes();
+                self.keybind_axial = self.keybind_axial.next();
+                self.message =
+                    Some(format!("set axis mode to {}", self.keybind_axial.name()));
+            }
+            return true;
+        }
+        if c == self.prefs.global_keys.undo {
+            self.flush_modes();
+            let undid = self.undo_history.pop();
+            match undid {
+                None => self.message = Some("nothing to undo".to_string()),
+                Some(undid) => {
+                    self.puzzle.turn(undid.inverse());
+                    self.redo_history.push(undid);
+                    self.rev_stack_adjust();
+                }
+            }
+            return true;
+        }
+        if c == self.prefs.global_keys.redo {
+            self.flush_modes();
+            let redid = self.redo_history.pop();
+            match redid {
+                None => self.message = Some("nothing to redo".to_string()),
+                Some(redid) => {
+                    self.puzzle.turn(redid.clone());
+                    self.undo_history.push(redid);
+                    self.rev_stack_adjust();
+                }
+            }
+            return true;
+        }
+        if c == self.prefs.global_keys.next_filter {
+            if self.filters.is_empty() {
+                self.message = Some("no filters loaded".to_string());
+            } else {
+                self.flush_modes();
+                self.filter_ind += 1;
+                self.use_live_filter = false;
+                self.message = Some("next filter".to_string());
+            }
+            return true;
+        }
+        if c == self.prefs.global_keys.prev_filter {
+            if self.filters.is_empty() {
+                self.message = Some("no filters loaded".to_string());
+            } else {
+                self.flush_modes();
+                self.filter_ind -= 1;
+                self.use_live_filter = false;
+                self.message = Some("previous filter".to_string());
+            }
+            return true;
+        }
+        if let Some(s) = self.prefs.global_keys.layers.iter().position(|ch| ch == &c) {
+            if s as i16 >= self.puzzle.n {
+                return true;
+            }
+            self.flush_modes();
+            self.current_turn.layer_char = Some(c);
+            self.current_turn.layer = Some(TurnLayer::Layer(s as i16));
+            return true;
+        }
+        if self.current_turn.layer != Some(TurnLayer::WholePuzzle)
+            && !self.awaiting_side_as_axis()
+            && let Some(kp) = self.get_side(c)
+            && !(self.current_turn.side.is_some() && self.get_axis_key(c).is_some())
+        {
+            if ax(kp.axis) as u16 >= self.puzzle.d {
+                return true;
+            }
+            if self.current_turn.layer.is_none() || self.current_turn.side.is_some() {
+                self.flush_modes();
+            }
+            self.current_turn.side = Some(kp);
+            return true;
+        }
+        if c == self.prefs.global_keys.rotate {
+            self.flush_modes();
+            self.current_turn.layer_char = Some(c);
+            self.current_turn.layer = Some(TurnLayer::WholePuzzle);
+            return true;
+        }
+        false
+    }
+
+    fn try_three_key(&mut self, c: char) {
+        let strict = self.keybind_set == KeybindSet::ThreeKeyStrict;
+        let axis = if strict {
+            self.get_side(c)
+        } else {
+            self.get_axis_key(c)
+        };
+        let Some(kp) = axis else { return };
+
+        if !(self.current_turn.side.is_some()
+            || self.current_turn.layer == Some(TurnLayer::WholePuzzle))
+        {
+            return;
+        }
+        if ax(kp.axis) as u16 >= self.puzzle.d {
+            return;
+        }
+
+        let side_axis = if let Some(side_kp) = self.current_turn.side {
+            side_kp.axis
+        } else if self.current_turn.layer == Some(TurnLayer::WholePuzzle) {
+            0
+        } else {
+            return;
+        };
+
+        if self.current_turn.from.is_none() {
+            self.last_turn_keys.clear();
+        }
+
+        if let Some(from_kp) = self.current_turn.from {
+            let (from_norm, to_norm) =
+                if self.current_turn.layer == Some(TurnLayer::WholePuzzle) {
+                    let f = ax(from_kp.axis);
+                    let t = ax(kp.axis);
+                    if (from_kp.axis < 0) != (kp.axis < 0) {
+                        (t, f)
+                    } else {
+                        (f, t)
+                    }
+                } else {
+                    (from_kp.axis, kp.axis)
+                };
+            // perform_turn must be called BEFORE clearing any state
+            if self.perform_turn(side_axis, from_norm, to_norm).is_some() {
+                let mut keys = self.current_turn.current_keys();
+                keys.push(kp.ch);
+                self.last_turn_keys = keys;
+            } else {
+                self.alert = self.prefs.alert_frames * 4 - 1;
+                self.last_turn_keys.clear();
+            }
+            self.current_turn.from = None;
+            if strict {
+                self.current_turn.clear();
+            }
+        } else {
+            self.current_turn.from = Some(kp);
+        }
+    }
+
+    fn try_fixed_3d(&mut self, c: char) {
+        let (axis, flip) =
+            if let Some(s) = self.prefs.axes.iter().position(|ax| ax.pos.keys.side == c) {
+                (s as i16, true)
+            } else if let Some(s) =
+                self.prefs.axes.iter().position(|ax| ax.neg.keys.side == c)
+            {
+                (!(s as i16), true)
+            } else {
+                return;
+            };
+        if ax(axis) as u16 >= self.puzzle.d {
+            return;
+        }
+        if self.current_turn.layer.is_none() || self.current_turn.side.is_some() {
+            self.flush_modes();
+        }
+        self.current_turn.side = Some(KeyPress { ch: c, axis });
+
+        let (from, to) = if flip {
+            if axis < 0 {
+                ((!axis + 1) % 3, (!axis + 2) % 3)
+            } else {
+                ((axis + 2) % 3, (axis + 1) % 3)
+            }
+        } else if axis < 0 {
+            ((!axis + 2) % 3, (!axis + 1) % 3)
+        } else {
+            ((axis + 1) % 3, (axis + 2) % 3)
+        };
+        if self.perform_turn(axis, from, to).is_some() {
+            self.last_turn_keys = self.current_turn.current_keys();
+        } else {
+            self.alert = self.prefs.alert_frames * 4 - 1;
+            self.last_turn_keys.clear();
+        }
+    }
+
+    fn try_fixed_key(&mut self, c: char) {
+        let Some(kp) = self.get_axis_key(c) else { return };
+        if ax(kp.axis) as u16 >= self.puzzle.d {
+            return;
+        }
+
+        let whole_puzzle = self.current_turn.layer == Some(TurnLayer::WholePuzzle);
+        let required_fixed = if whole_puzzle {
+            self.puzzle.d as usize - 2
+        } else {
+            self.puzzle.d as usize - 3
+        };
+        if !whole_puzzle && self.current_turn.side.is_none() {
+            return;
+        }
+
+        if self.current_turn.fixed.is_empty() {
+            self.last_turn_keys.clear();
+        }
+        self.current_turn.fixed.push(kp);
+        if self.current_turn.fixed.len() != required_fixed {
+            return;
+        }
+
+        let mut sign = true;
+        let mut axes: Vec<i16> = if let Some(side_kp) = &self.current_turn.side {
+            vec![side_kp.axis]
+        } else {
+            vec![]
+        };
+        axes.extend(self.current_turn.fixed.iter().map(|kp| kp.axis));
+        for axis in &mut axes {
+            if *axis < 0 {
+                sign = !sign;
+                *axis = !*axis;
+            }
+        }
+        for axis in 0..self.puzzle.d as i16 {
+            if !axes.contains(&axis) {
+                axes.push(axis);
+            }
+        }
+        if axes.len() > self.puzzle.d as usize {
+            self.alert = self.prefs.alert_frames * 4 - 1;
+            self.current_turn.fixed.clear();
+            return;
+        }
+        for i in 0..axes.len() {
+            for j in 0..i {
+                if i > j {
+                    sign = !sign;
+                }
+            }
+        }
+        let mut from = axes[axes.len() - 2];
+        let mut to = axes[axes.len() - 1];
+        if !sign {
+            std::mem::swap(&mut from, &mut to);
+        }
+        let side_axis = self.current_turn.side.as_ref().map(|kp| kp.axis).unwrap_or(0);
+        // Capture canonical string BEFORE clearing fixed
+        if self.perform_turn(side_axis, from, to).is_some() {
+            self.last_turn_keys = self.current_turn.current_keys();
+        } else {
+            self.alert = self.prefs.alert_frames * 4 - 1;
+            self.last_turn_keys.clear();
+        }
+        self.current_turn.fixed.clear();
+    }
+
+    fn get_side(&self, c: char) -> Option<KeyPress> {
         self.prefs
             .axes
             .iter()
             .position(|ax| ax.pos.keys.select == c)
-            .map(|s| s as i16)
+            .map(|s| KeyPress { ch: c, axis: s as i16 })
             .or_else(|| {
                 self.prefs
                     .axes
                     .iter()
                     .position(|ax| ax.neg.keys.select == c)
-                    .map(|s| !(s as i16))
+                    .map(|s| KeyPress { ch: c, axis: !(s as i16) })
             })
     }
 
@@ -370,301 +667,21 @@ impl AppState {
         } else {
             match self.mode {
                 AppMode::Turn => {
-                    let mut just_pressed_side = false;
-
-                    if c == self.prefs.global_keys.keybind_mode {
-                        self.flush_modes();
-                        self.keybind_set = self.keybind_set.next(self.puzzle.n);
-                        self.message = Some(format!("set keybinds to {}", self.keybind_set.name()))
-                    } else if c == self.prefs.global_keys.axis_mode {
-                        if self.puzzle.d > 6 {
-                            self.message = Some("not enough room for side keybinds".to_string());
-                        } else {
-                            self.flush_modes();
-                            self.keybind_axial = self.keybind_axial.next();
-                            self.message =
-                                Some(format!("set axis mode to {}", self.keybind_axial.name()))
-                        }
-                    } else if c == self.prefs.global_keys.undo {
-                        self.flush_modes();
-                        let undid = self.undo_history.pop();
-                        match undid {
-                            None => {
-                                self.message = Some("nothing to undo".to_string());
-                            }
-                            Some(undid) => {
-                                self.puzzle.turn(undid.inverse());
-                                self.redo_history.push(undid);
-                                self.rev_stack_adjust();
-                            }
-                        }
-                    } else if c == self.prefs.global_keys.redo {
-                        self.flush_modes();
-                        let redid = self.redo_history.pop();
-                        match redid {
-                            None => {
-                                self.message = Some("nothing to redo".to_string());
-                            }
-                            Some(redid) => {
-                                self.puzzle.turn(redid.clone());
-                                self.undo_history.push(redid);
-                                self.rev_stack_adjust();
-                            }
-                        }
-                    } else if c == self.prefs.global_keys.next_filter {
-                        if self.filters.is_empty() {
-                            self.message = Some("no filters loaded".to_string());
-                        } else {
-                            self.flush_modes();
-                            self.filter_ind += 1;
-                            self.use_live_filter = false;
-                            self.message = Some("next filter".to_string());
-                        }
-                    } else if c == self.prefs.global_keys.prev_filter {
-                        if self.filters.is_empty() {
-                            self.message = Some("no filters loaded".to_string());
-                        } else {
-                            self.flush_modes();
-                            self.filter_ind -= 1;
-                            self.use_live_filter = false;
-                            self.message = Some("previous filter".to_string());
-                        }
-                    } else if let Some(s) =
-                        self.prefs.global_keys.layers.iter().position(|ch| ch == &c)
-                    {
-                        if s as i16 >= self.puzzle.n {
-                            return;
-                        }
-                        self.flush_modes();
-                        self.current_keys.push(c);
-                        self.current_turn.layer = Some(TurnLayer::Layer(s as i16));
-                    } else if self.current_turn.layer != Some(TurnLayer::WholePuzzle)
-                        && !self.awaiting_side_as_axis()
-                        && let Some(s) = self.get_side(c)
-                        && !(self.current_turn.side.is_some() && self.get_axis_key(c).is_some())
-                    {
-                        if s.max(!s) as u16 >= self.puzzle.d {
-                            return;
-                        }
-                        if self.current_turn.layer.is_none() || self.current_turn.side.is_some() {
-                            self.flush_modes();
-                        }
-                        self.current_keys.push(c);
-                        self.current_turn.side = Some(s);
-                        just_pressed_side = true;
-                    } else if c == self.prefs.global_keys.rotate {
-                        self.flush_modes();
-                        self.current_keys.push(c);
-                        self.current_turn.layer = Some(TurnLayer::WholePuzzle);
-                        just_pressed_side = true;
+                    let consumed = self.handle_prefix_keys(c);
+                    if consumed {
+                        self.last_turn_keys.clear();
+                        return;
                     }
-
                     match self.keybind_set {
                         KeybindSet::ThreeKey | KeybindSet::ThreeKeyStrict => {
-                            let strict = self.keybind_set == KeybindSet::ThreeKeyStrict;
-
-                            let axis = if strict {
-                                self.get_side(c)
-                            } else {
-                                self.get_axis_key(c)
-                            };
-
-                            if (self.current_turn.side.is_some()
-                                || self.current_turn.layer == Some(TurnLayer::WholePuzzle))
-                                && !just_pressed_side
-                                && let Some(s) = axis
-                            {
-                                if ax(s) as u16 >= self.puzzle.d {
-                                    return;
-                                }
-
-                                let side = if self.current_turn.side.is_some() {
-                                    self.current_turn.side
-                                } else if self.current_turn.layer == Some(TurnLayer::WholePuzzle) {
-                                    Some(0) // dummy value
-                                } else {
-                                    None
-                                };
-
-                                if let Some(side) = side {
-                                    if self.current_turn.from.is_none() {
-                                        self.current_keys = self.base_keys();
-                                    }
-                                    self.current_keys.push(c);
-
-                                    if let Some(from_raw) = self.current_turn.from {
-                                        let (from_norm, to_norm) = if self.current_turn.layer == Some(TurnLayer::WholePuzzle) {
-                                            let mut from_norm = ax(from_raw);
-                                            let mut to_norm = ax(s);
-                                            if (from_raw < 0) != (s < 0) {
-                                                std::mem::swap(&mut from_norm, &mut to_norm);
-                                            }
-                                            (from_norm, to_norm)
-                                        } else {
-                                            (from_raw, s)
-                                        };
-                                        let turn_out = self.perform_turn(side, from_norm, to_norm);
-
-                                        if turn_out.is_none() {
-                                            self.alert = self.prefs.alert_frames * 4 - 1;
-                                            let key_removal = if strict { 3 } else { 2 };
-                                            self.current_keys = self.current_keys
-                                                [..self.current_keys.len() - key_removal]
-                                                .to_string();
-                                        } else {
-                                            self.current_keys = self.canonical_turn_keys(from_raw, s);
-                                        }
-                                        self.current_turn.from = None;
-                                        if strict {
-                                            self.current_turn = Default::default();
-                                        }
-                                    } else {
-                                        self.current_turn.from = Some(s);
-                                    }
-                                }
-                            }
+                            self.try_three_key(c);
                         }
                         KeybindSet::FixedKey if self.puzzle.d == 3 => {
-                            let flip;
-                            if let Some(s) =
-                                self.prefs.axes.iter().position(|ax| ax.pos.keys.side == c)
-                            {
-                                if ax(s as i16) as u16 >= self.puzzle.d {
-                                    return;
-                                }
-                                if self.current_turn.layer.is_none()
-                                    || self.current_turn.side.is_some()
-                                {
-                                    self.flush_modes();
-                                }
-                                self.current_keys.push(c);
-                                self.current_turn.side = Some(s as i16);
-                                flip = true;
-                                just_pressed_side = true;
-                            } else if let Some(s) =
-                                self.prefs.axes.iter().position(|ax| ax.neg.keys.side == c)
-                            {
-                                if ax(s as i16) as u16 >= self.puzzle.d {
-                                    return;
-                                }
-                                if self.current_turn.layer.is_none()
-                                    || self.current_turn.side.is_some()
-                                {
-                                    self.flush_modes();
-                                }
-                                self.current_keys.push(c);
-                                self.current_turn.side = Some(!(s as i16));
-                                flip = true;
-                                just_pressed_side = true;
-                            } else {
-                                flip = false;
-                            }
-
-                            if let (Some(side), true) = (self.current_turn.side, just_pressed_side)
-                            {
-                                let _turn_out = if flip {
-                                    if side < 0 {
-                                        self.perform_turn(side, (!side + 1) % 3, (!side + 2) % 3)
-                                    } else {
-                                        self.perform_turn(side, (side + 2) % 3, (side + 1) % 3)
-                                    }
-                                } else if side < 0 {
-                                    self.perform_turn(side, (!side + 2) % 3, (!side + 1) % 3)
-                                } else {
-                                    self.perform_turn(side, (side + 1) % 3, (side + 2) % 3)
-                                };
-                            }
+                            self.try_fixed_3d(c);
                         }
                         KeybindSet::FixedKey => {
-                            let axis = self.get_axis_key(c);
-
-                            if !just_pressed_side
-                                && let Some(s) = axis {
-                                if ax(s) as u16 >= self.puzzle.d {
-                                    return;
-                                }
-                                if self.current_turn.fixed.is_empty() {
-                                    self.current_keys = self.base_keys();
-                                }
-                                self.current_keys.push(c);
-                                self.current_turn.fixed.push(s);
-
-                                let whole_puzzle =
-                                    self.current_turn.layer == Some(TurnLayer::WholePuzzle);
-                                let required_fixed = if whole_puzzle {
-                                    self.puzzle.d as usize - 2
-                                } else {
-                                    self.puzzle.d as usize - 3
-                                };
-
-                                let side = if whole_puzzle {
-                                    None
-                                } else {
-                                    self.current_turn.side
-                                };
-
-                                if side.is_some() || whole_puzzle {
-                                    if self.current_turn.fixed.len() == required_fixed {
-                                        let mut sign = true;
-                                        let mut axes = if let Some(side) = side {
-                                            vec![side]
-                                        } else {
-                                            vec![]
-                                        };
-                                        axes.extend(self.current_turn.fixed.iter().cloned());
-
-                                        for axis in &mut axes {
-                                            if *axis < 0 {
-                                                sign = !sign;
-                                                *axis = !*axis;
-                                            }
-                                        }
-
-                                        for axis in 0..self.puzzle.d as i16 {
-                                            if !axes.contains(&axis) {
-                                                axes.push(axis);
-                                            }
-                                        }
-
-                                        let mut turn_out = Some(()); // i wish we had try blocks
-
-                                        if axes.len() > self.puzzle.d as usize {
-                                            // there was a duplicate in axes
-                                            turn_out = None;
-                                        }
-
-                                        let turn_out = turn_out.and_then(|_| {
-                                            for i in 0..axes.len() {
-                                                for j in 0..i {
-                                                    if i > j {
-                                                        sign = !sign;
-                                                    }
-                                                }
-                                            }
-                                            let mut from = axes[axes.len() - 2];
-                                            let mut to = axes[axes.len() - 1];
-                                            if !sign {
-                                                std::mem::swap(&mut from, &mut to);
-                                            }
-                                            self.perform_turn(
-                                                side.unwrap_or(0),
-                                                from,
-                                                to,
-                                            )
-                                        });
-
-                                        if turn_out.is_none() {
-                                            self.alert = self.prefs.alert_frames * 4 - 1;
-                                            self.current_keys =
-                                                self.current_keys[..self.current_keys.len()
-                                                    - self.current_turn.fixed.len()]
-                                                    .to_string();
-                                        }
-                                        self.current_turn.fixed = vec![];
-                                    }
-                                }
-                            }
-                        } //_ => todo!(),
+                            self.try_fixed_key(c);
+                        }
                     }
                 }
 
@@ -729,76 +746,26 @@ impl AppState {
         }
     }
 
-    fn get_axis_key(&self, c: char) -> Option<i16> {
+    fn get_axis_key(&self, c: char) -> Option<KeyPress> {
         if self.keybind_set == KeybindSet::ThreeKeyStrict {
             return None;
         }
 
         match self.keybind_axial {
-            KeybindAxial::Axial => self.prefs.axes.iter().position(|ax| ax.axis_key == c),
+            KeybindAxial::Axial => self
+                .prefs
+                .axes
+                .iter()
+                .position(|ax| ax.axis_key == c)
+                .map(|s| KeyPress { ch: c, axis: s as i16 }),
             KeybindAxial::Side => self.prefs.axes.iter().enumerate().find_map(|(s, ax)| {
                 (ax.pos.keys.side == c)
-                    .then_some(s)
-                    .or_else(|| (ax.neg.keys.side == c).then_some(!s))
+                    .then_some(KeyPress { ch: c, axis: s as i16 })
+                    .or_else(|| {
+                        (ax.neg.keys.side == c).then_some(KeyPress { ch: c, axis: !(s as i16) })
+                    })
             }),
         }
-        .map(|s| s as i16)
-    }
-
-    fn base_keys(&self) -> String {
-        let mut s = String::new();
-        if let Some(TurnLayer::Layer(l)) = self.current_turn.layer {
-            if let Some(&ch) = self.prefs.global_keys.layers.get(l as usize) {
-                s.push(ch);
-            }
-        } else if self.current_turn.layer == Some(TurnLayer::WholePuzzle) {
-            s.push(self.prefs.global_keys.rotate);
-            return s;
-        }
-        if let Some(side) = self.current_turn.side {
-            if side >= 0 {
-                if let Some(axis) = self.prefs.axes.get(side as usize) {
-                    s.push(axis.pos.keys.select);
-                }
-            } else if let Some(axis) = self.prefs.axes.get((!side) as usize) {
-                s.push(axis.neg.keys.select);
-            }
-        }
-        s
-    }
-
-    fn axis_key_char(&self, axis: i16) -> Option<char> {
-        if self.keybind_set == KeybindSet::ThreeKeyStrict {
-            if axis >= 0 {
-                self.prefs.axes.get(axis as usize).map(|ax| ax.pos.keys.select)
-            } else {
-                self.prefs.axes.get((!axis) as usize).map(|ax| ax.neg.keys.select)
-            }
-        } else {
-            match self.keybind_axial {
-                KeybindAxial::Axial => {
-                    self.prefs.axes.get(ax(axis) as usize).map(|ax| ax.axis_key)
-                }
-                KeybindAxial::Side => {
-                    if axis >= 0 {
-                        self.prefs.axes.get(axis as usize).map(|ax| ax.pos.keys.side)
-                    } else {
-                        self.prefs.axes.get((!axis) as usize).map(|ax| ax.neg.keys.side)
-                    }
-                }
-            }
-        }
-    }
-
-    fn canonical_turn_keys(&self, from: i16, to: i16) -> String {
-        let mut s = self.base_keys();
-        if let Some(ch) = self.axis_key_char(from) {
-            s.push(ch);
-        }
-        if let Some(ch) = self.axis_key_char(to) {
-            s.push(ch);
-        }
-        s
     }
 
     fn perform_turn(&mut self, side: i16, from: i16, to: i16) -> Option<()> {
@@ -883,7 +850,13 @@ impl AppState {
             return message.to_string();
         }
         match self.mode {
-            AppMode::Turn => self.current_keys.clone(),
+            AppMode::Turn => {
+                if !self.last_turn_keys.is_empty() {
+                    self.last_turn_keys.clone()
+                } else {
+                    self.current_turn.current_keys()
+                }
+            }
             AppMode::LiveFilter => format!("live filter: {}", self.live_filter_string),
         }
     }
