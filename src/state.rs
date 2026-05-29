@@ -418,6 +418,19 @@ impl AppState {
                 self.flush_modes();
             }
             self.current_turn.side = Some(kp);
+            if self.keybind_set == KeybindSet::FixedKey && self.puzzle.d == 3 {
+                let (from, to) = if kp.axis < 0 {
+                    ((!kp.axis + 2) % 3, (!kp.axis + 1) % 3)
+                } else {
+                    ((kp.axis + 1) % 3, (kp.axis + 2) % 3)
+                };
+                if self.perform_turn(kp.axis, from, to).is_some() {
+                    self.last_turn_keys = self.current_turn.current_keys();
+                } else {
+                    self.alert = self.prefs.alert_frames * 4 - 1;
+                    self.last_turn_keys.clear();
+                }
+            }
             return true;
         }
         if c == self.prefs.global_keys.rotate {
@@ -493,45 +506,9 @@ impl AppState {
         }
     }
 
-    // Process a side key in FixedKey mode for 3D puzzles.
-    // A single side key fully defines the rotation (no axis keys needed).
-    fn try_fixed_3d(&mut self, c: char) {
-        let (axis, flip) =
-            if let Some(s) = self.prefs.axes.iter().position(|ax| ax.pos.keys.side == c) {
-                (s as i16, true)
-            } else if let Some(s) =
-                self.prefs.axes.iter().position(|ax| ax.neg.keys.side == c)
-            {
-                (!(s as i16), true)
-            } else {
-                return;
-            };
-        if ax(axis) as u16 >= self.puzzle.d {
-            return;
-        }
-        if self.current_turn.layer.is_none() || self.current_turn.side.is_some() {
-            self.flush_modes();
-        }
-        self.current_turn.side = Some(KeyPress { ch: c, axis });
-
-        let (from, to) = if flip {
-            if axis < 0 {
-                ((!axis + 1) % 3, (!axis + 2) % 3)
-            } else {
-                ((axis + 2) % 3, (axis + 1) % 3)
-            }
-        } else if axis < 0 {
-            ((!axis + 2) % 3, (!axis + 1) % 3)
-        } else {
-            ((axis + 1) % 3, (axis + 2) % 3)
-        };
-        if self.perform_turn(axis, from, to).is_some() {
-            self.last_turn_keys = self.current_turn.current_keys();
-        } else {
-            self.alert = self.prefs.alert_frames * 4 - 1;
-            self.last_turn_keys.clear();
-        }
-    }
+    // In FixedKey 3D, the turn is handled inline by handle_prefix_keys
+    // when a select key is pressed — a single keypress fully defines the rotation.
+    fn try_fixed_3d(&mut self, _c: char) {}
 
     // Process an axis key in FixedKey mode for d > 3.
     // Accumulates axes in `fixed` until d-3 (or d-2 for whole-puzzle) are collected,
