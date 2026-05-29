@@ -566,13 +566,9 @@ impl AppState {
             self.current_turn.fixed.clear();
             return;
         }
-        for i in 0..axes.len() {
-            for j in 0..i {
-                if i > j {
-                    sign = !sign;
-                }
-            }
-        }
+        // The sign is determined solely by the number of negative axis
+        // keys: all-positive = counterclockwise, each negative flips it.
+        // The permutation order does not affect rotation direction.
         let mut from = axes[axes.len() - 2];
         let mut to = axes[axes.len() - 1];
         if !sign {
@@ -1456,8 +1452,7 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                 ch = if (state.current_turn.side.is_none()
                         && state.current_turn.layer != Some(TurnLayer::WholePuzzle))
                     || (state.keybind_set == KeybindSet::FixedKey
-                        && state.puzzle.d == 3
-                        && state.current_turn.layer != Some(TurnLayer::WholePuzzle))
+                        && state.puzzle.d == 3)
                     || state.keybind_set == KeybindSet::ThreeKeyStrict
                 {
                     if *side >= 0 {
