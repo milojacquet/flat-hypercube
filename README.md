@@ -16,16 +16,18 @@ Each side has several keys that can be used to access it in different contexts. 
 
 | Side (+/-) | Selector | Axis mode | Side mode |
 | -------- | ------- | ------- | ------- |
-| R, L | <kbd>F</kbd>, <kbd>S</kbd> | <kbd>K</kbd> | <kbd>L</kbd>, <kbd>U</kbd> |
-| U, D | <kbd>E</kbd>, <kbd>D</kbd> | <kbd>J</kbd> | <kbd>I</kbd>, <kbd>,</kbd> |
-| F, B | <kbd>R</kbd>, <kbd>W</kbd> | <kbd>L</kbd> | <kbd>J</kbd>, <kbd>O</kbd> |
-| O, I | <kbd>T</kbd>, <kbd>G</kbd> | <kbd>I</kbd> | <kbd>.</kbd>, <kbd>K</kbd> |
-| A, P | <kbd>V</kbd>, <kbd>C</kbd> | <kbd>U</kbd> | <kbd>P</kbd>, <kbd>L</kbd> |
-| Γ, Δ | <kbd>Y</kbd>, <kbd>H</kbd> | <kbd>O</kbd> | <kbd>[</kbd>, <kbd>;</kbd> |
-| Θ, Λ | <kbd>N</kbd>, <kbd>B</kbd> | <kbd>P</kbd> | N/A |
-| Ξ, Π | <kbd>Q</kbd>, <kbd>A</kbd> | <kbd>;</kbd> | N/A |
-| Σ, Φ | <kbd>,</kbd>, <kbd>M</kbd> | <kbd>[</kbd> | N/A |
-| Ψ, Ω | <kbd>/</kbd>, <kbd>.</kbd> | <kbd>'</kbd> | N/A |
+| R, L | <kbd>F</kbd>, <kbd>S</kbd> | <kbd>K</kbd> | <kbd>L</kbd>, <kbd>J</kbd> |
+| U, D | <kbd>E</kbd>, <kbd>D</kbd> | <kbd>J</kbd> | <kbd>I</kbd>, <kbd>K</kbd> |
+| F, B | <kbd>R</kbd>, <kbd>W</kbd> | <kbd>L</kbd> | <kbd>O</kbd>, <kbd>U</kbd> |
+| O, I | <kbd>T</kbd>, <kbd>G</kbd> | <kbd>I</kbd> | <kbd>P</kbd>, <kbd>;</kbd> |
+| A, P | <kbd>V</kbd>, <kbd>C</kbd> | <kbd>U</kbd> | <kbd>.</kbd>, <kbd>,</kbd> |
+| Γ, Δ | <kbd>Y</kbd>, <kbd>H</kbd> | <kbd>O</kbd> | <kbd>[</kbd>, <kbd>'</kbd> |
+| Θ, Λ | <kbd>N</kbd>, <kbd>B</kbd> | <kbd>P</kbd> | <kbd>N</kbd>, <kbd>M</kbd> |
+| Ξ, Π | <kbd>Q</kbd>, <kbd>A</kbd> | <kbd>;</kbd> | <kbd>Y</kbd>, <kbd>H</kbd> |
+| Σ, Φ | <kbd>,</kbd>, <kbd>M</kbd> | <kbd>[</kbd> | <kbd>T</kbd>, <kbd>G</kbd> |
+| Ψ, Ω | <kbd>/</kbd>, <kbd>.</kbd> | <kbd>'</kbd> | <kbd>V</kbd>, <kbd>B</kbd> |
+
+Keys within the same column must be unique (e.g. all selector keys must differ from each other), but keys *between* columns may overlap — a key can be a selector on one axis and an axis or side key on another.
 
 #### Three-key mode
 
@@ -37,9 +39,9 @@ In **side mode**, whole-puzzle rotations respect the sign of each axis key: pres
 
 #### Fixed-key mode
 
-In this mode, first use the side selector, then use enough axis keys to fix the rotation to occur in a plane. Once you complete a move, you can continue to use axis keys to do additional moves on the same side. For a whole-puzzle rotation, press <kbd>X</kbd> as the first key in the sequence — it replaces the side selector and requires one additional axis key (d−2 total instead of d−3).
+In this mode, first use a selector key to choose which side to turn, then press enough axis keys (or side keys in side mode) to fix the rotation to a plane. Once a move completes, you can continue to press axis keys for additional moves on the same side. For a whole-puzzle rotation, press <kbd>X</kbd> first — it replaces the selector and requires one extra axis key (d−2 total instead of d−3).
 
-In three dimensions, just pressing a side selector key rotates that side counterclockwise. To rotate it clockwise, use the corresponding face selector key from side mode.
+In three dimensions, just pressing a **selector** key immediately rotates that face counterclockwise; the negative selector key rotates it clockwise. Press <kbd>X</kbd> before the selector key to rotate the whole puzzle instead. Layer selections and <kbd>X</kbd> persist across turns until explicitly cleared by <kbd>Esc</kbd> or another layer key.
 
 ### Commutators and conjugators
 

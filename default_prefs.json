@@ -147,7 +147,7 @@
                 "keys":
                 {
                     "select": "n",
-                    "side": "∅"
+                    "side": "n"
                 }
             },
             "neg":
@@ -157,7 +157,7 @@
                 "keys":
                 {
                     "select": "b",
-                    "side": "∅"
+                    "side": "m"
                 }
             },
             "axis_key": "p"
@@ -170,7 +170,7 @@
                 "keys":
                 {
                     "select": "q",
-                    "side": "∅"
+                    "side": "y"
                 }
             },
             "neg":
@@ -180,7 +180,7 @@
                 "keys":
                 {
                     "select": "a",
-                    "side": "∅"
+                    "side": "h"
                 }
             },
             "axis_key": ";"
@@ -193,7 +193,7 @@
                 "keys":
                 {
                     "select": ",",
-                    "side": "∅"
+                    "side": "t"
                 }
             },
             "neg":
@@ -203,7 +203,7 @@
                 "keys":
                 {
                     "select": "m",
-                    "side": "∅"
+                    "side": "g"
                 }
             },
             "axis_key": "["
@@ -216,7 +216,7 @@
                 "keys":
                 {
                     "select": "/",
-                    "side": "∅"
+                    "side": "v"
                 }
             },
             "neg":
@@ -226,7 +226,7 @@
                 "keys":
                 {
                     "select": ".",
-                    "side": "∅"
+                    "side": "b"
                 }
             },
             "axis_key": "'"
