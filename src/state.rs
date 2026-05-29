@@ -106,11 +106,11 @@ pub enum KeybindSet {
 }
 
 impl KeybindSet {
-    fn valid(&self, n: i16) -> bool {
+    fn valid(&self, _n: i16) -> bool {
         match self {
             Self::ThreeKey => true,
             Self::ThreeKeyStrict => true,
-            Self::FixedKey => n >= 3,
+            Self::FixedKey => true,
             //Self::XyzKey => n == 4,
         }
     }
@@ -339,14 +339,10 @@ impl AppState {
             return true;
         }
         if c == self.prefs.global_keys.axis_mode {
-            if self.puzzle.d > 6 {
-                self.message = Some("not enough room for side keybinds".to_string());
-            } else {
-                self.flush_modes();
-                self.keybind_axial = self.keybind_axial.next();
-                self.message =
-                    Some(format!("set axis mode to {}", self.keybind_axial.name()));
-            }
+            self.flush_modes();
+            self.keybind_axial = self.keybind_axial.next();
+            self.message =
+                Some(format!("set axis mode to {}", self.keybind_axial.name()));
             return true;
         }
         if c == self.prefs.global_keys.undo {
@@ -406,7 +402,14 @@ impl AppState {
             self.current_turn.layer = Some(TurnLayer::Layer(s as i16));
             return true;
         }
-        if self.current_turn.layer != Some(TurnLayer::WholePuzzle)
+        // Side-select guard: normally skipped when WholePuzzle is set (the
+        // key should be an axis key), but FixedKey 3D needs it for x+key.
+        if (self.current_turn.layer != Some(TurnLayer::WholePuzzle)
+                || (self.keybind_set == KeybindSet::FixedKey && self.puzzle.d == 3))
+            // In ThreeKey, a key that is both select and axis should be
+            // processed as an axis when side is already set — skip this
+            // branch. FixedKey 3D has no downstream axis processing, so
+            // exclude it from the guard.
             && !self.awaiting_side_as_axis()
             && let Some(kp) = self.get_side(c)
             && !(self.current_turn.side.is_some()
@@ -416,7 +419,7 @@ impl AppState {
             if ax(kp.axis) as u16 >= self.puzzle.d {
                 return true;
             }
-            if self.current_turn.layer.is_none() || self.current_turn.side.is_some() {
+            if self.current_turn.layer.is_none() {
                 self.flush_modes();
             }
             self.current_turn.side = Some(kp);
@@ -508,14 +511,15 @@ impl AppState {
         }
     }
 
-    // In FixedKey 3D, the turn is handled inline by handle_prefix_keys
-    // when a select key is pressed — a single keypress fully defines the rotation.
-    fn try_fixed_3d(&mut self, _c: char) {}
-
+    // In FixedKey 3D, normal turns are handled inline by handle_prefix_keys.
+    // Whole-puzzle (x) rotations are routed to try_three_key for axis input.
     // Process an axis key in FixedKey mode for d > 3.
     // Accumulates axes in `fixed` until d-3 (or d-2 for whole-puzzle) are collected,
     // then resolves the rotation plane and direction via permutation parity.
     fn try_fixed_key(&mut self, c: char) {
+        if self.puzzle.d < 3 {
+            return;
+        }
         let Some(kp) = self.get_axis_key(c) else { return };
         if ax(kp.axis) as u16 >= self.puzzle.d {
             return;
@@ -670,9 +674,7 @@ impl AppState {
                         KeybindSet::ThreeKey | KeybindSet::ThreeKeyStrict => {
                             self.try_three_key(c);
                         }
-                        KeybindSet::FixedKey if self.puzzle.d == 3 => {
-                            self.try_fixed_3d(c);
-                        }
+                        KeybindSet::FixedKey if self.puzzle.d == 3 => {}
                         KeybindSet::FixedKey => {
                             self.try_fixed_key(c);
                         }
