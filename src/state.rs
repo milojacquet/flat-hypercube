@@ -409,7 +409,9 @@ impl AppState {
         if self.current_turn.layer != Some(TurnLayer::WholePuzzle)
             && !self.awaiting_side_as_axis()
             && let Some(kp) = self.get_side(c)
-            && !(self.current_turn.side.is_some() && self.get_axis_key(c).is_some())
+            && !(self.current_turn.side.is_some()
+                && self.get_axis_key(c).is_some()
+                && !(self.keybind_set == KeybindSet::FixedKey && self.puzzle.d == 3))
         {
             if ax(kp.axis) as u16 >= self.puzzle.d {
                 return true;
