@@ -210,6 +210,8 @@ impl Layout {
                     HashMap::new()
                 },
             }
+        } else if n == 2 {
+            Self::make_layout_inner_n2(d, vertical, gaps)
         } else {
             let make_horizontal = d % 2 == 1 && !vertical;
 
@@ -250,6 +252,95 @@ impl Layout {
                 row.reverse();
                 Self::concat_vert(row, gaps[gap_idx])
             }
+        }
+    }
+
+    fn make_layout_inner_n2(d: u16, vertical: bool, gaps: &[i16]) -> Layout {
+        let make_horizontal = d % 2 == 1 && !vertical;
+        let lower = Self::make_layout_inner(2, d - 1, false, gaps);
+        let mut row = vec![];
+
+        for i in once(-2).chain(once(-1)).chain(once(1)).chain(once(2)) {
+            let mut layer = lower.clone().push_all(i).clean(2);
+            if i.abs() == 2 {
+                if make_horizontal {
+                    layer = layer.squish_horiz();
+                } else {
+                    layer = layer.squish_vert();
+                }
+            }
+
+            if i == -2 || i == 2 {
+                layer.keybind_hints.clear();
+            } else if d == 1 {
+                for ((x, y), pos) in layer.points.clone().iter() {
+                    if !pos.iter().any(|&v| v.abs() == 2) {
+                        layer.keybind_hints.insert((*x, *y), Some(if i == -1 { !0 } else { 0 }));
+                    }
+                }
+            } else if d == 2 {
+                let ns: Vec<(i16, i16)> = layer
+                    .points
+                    .iter()
+                    .filter(|(_, coords)| !coords.iter().any(|&v| v.abs() == 2))
+                    .map(|(&pos, _)| pos)
+                    .collect();
+                let min_x = ns.iter().map(|p| p.0).min().unwrap();
+                let max_x = ns.iter().map(|p| p.0).max().unwrap();
+                let row_y = ns[0].1;
+
+                layer.keybind_hints.clear();
+                if i == -1 {
+                    layer.keybind_hints.insert((min_x, row_y), Some(!1));
+                    layer.keybind_hints.insert((max_x, row_y), Some(0));
+                } else {
+                    layer.keybind_hints.insert((min_x, row_y), Some(!0));
+                    layer.keybind_hints.insert((max_x, row_y), Some(1));
+                }
+            } else {
+                if i == -1 {
+                    layer.keybind_hints.clear();
+                    Self::place_new_hints_n2(&mut layer, (d - 1) as i16, make_horizontal);
+                }
+            }
+
+            row.push(layer);
+        }
+
+        let gap_idx = d as usize + if vertical && d % 2 == 1 { 1 } else { 0 };
+        if make_horizontal {
+            Self::concat_horiz(row, gaps[gap_idx])
+        } else {
+            row.reverse();
+            Self::concat_vert(row, gaps[gap_idx])
+        }
+    }
+
+    /// Place both new-axis hints into the i=-1 layer (n=2, d≥3).
+    fn place_new_hints_n2(layer: &mut Layout, new_axis: i16, make_horizontal: bool) {
+        let mut ns: Vec<(i16, i16)> = layer
+            .points
+            .iter()
+            .filter(|(_, coords)| !coords.iter().any(|&v| v.abs() == 2))
+            .map(|(&pos, _)| pos)
+            .collect();
+
+        if ns.len() < 2 {
+            return;
+        }
+
+        if make_horizontal {
+            // topmost, then rightmost → top 1×2: left=neg, right=pos
+            ns.sort_by(|a, b| a.1.cmp(&b.1).then(b.0.cmp(&a.0)));
+            let (rx, ry) = ns[0];
+            layer.keybind_hints.insert((rx - 2, ry), Some(!new_axis));
+            layer.keybind_hints.insert((rx, ry), Some(new_axis));
+        } else {
+            // rightmost, then topmost → right 2×1: top=pos, bottom=neg
+            ns.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
+            let (rx, ry) = ns[0];
+            layer.keybind_hints.insert((rx, ry), Some(new_axis));
+            layer.keybind_hints.insert((rx, ry + 1), Some(!new_axis));
         }
     }
 }

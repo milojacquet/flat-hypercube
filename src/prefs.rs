@@ -96,6 +96,10 @@ impl Prefs {
             ("global live_filter_mode", gk.live_filter_mode),
             ("global reset_mode", gk.reset_mode),
             ("global save", gk.save),
+            ("global rev_start", gk.rev_start),
+            ("global rev_stop", gk.rev_stop),
+            ("global rev_unwind", gk.rev_unwind),
+            ("global rev_commutator", gk.rev_commutator),
         ] {
             if all.contains(&ch) {
                 return Err(format!(
@@ -156,6 +160,10 @@ pub struct GlobalKeys {
     pub live_filter_mode: char,
     pub reset_mode: char,
     pub save: char,
+    pub rev_start: char,
+    pub rev_stop: char,
+    pub rev_unwind: char,
+    pub rev_commutator: char,
 }
 
 fn hex(st: &str) -> Result<Color, ParseIntError> {

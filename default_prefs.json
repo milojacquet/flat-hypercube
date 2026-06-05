@@ -257,7 +257,11 @@
         "prev_filter": "J",
         "live_filter_mode": "F",
         "reset_mode": "⎋",
-        "save": "S"
+        "save": "S",
+        "rev_start": "Q",
+        "rev_stop": "W",
+        "rev_unwind": "E",
+        "rev_commutator": "R"
     },
     "global_colors":
     {

@@ -242,7 +242,7 @@ checksum = "11157ac094ffbdde99aa67b23417ebdd801842852b500e395a45a9c0aac03e4a"
 
 [[package]]
 name = "flat-hypercube"
-version = "2026.5.29"
+version = "2026.6.5"
 dependencies = [
  "chrono",
  "clap",
