@@ -1176,19 +1176,35 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                         state.process_key(BACKSPACE_CODE);
                     }
                     KeyCode::Up => {
-                        let step = (term_h.saturating_sub(2) as i16 * 3 / 4).max(1);
+                        let step = if modifiers.contains(KeyModifiers::CONTROL) {
+                            1
+                        } else {
+                            (term_h.saturating_sub(2) as i16 * 3 / 4).max(1)
+                        };
                         scroll_y = (scroll_y - step).max(0);
                     }
                     KeyCode::Down => {
-                        let step = (term_h.saturating_sub(2) as i16 * 3 / 4).max(1);
+                        let step = if modifiers.contains(KeyModifiers::CONTROL) {
+                            1
+                        } else {
+                            (term_h.saturating_sub(2) as i16 * 3 / 4).max(1)
+                        };
                         scroll_y = (scroll_y + step).min(scroll_max_y);
                     }
                     KeyCode::Left => {
-                        let step = (term_w as i16 * 3 / 4).max(1);
+                        let step = if modifiers.contains(KeyModifiers::CONTROL) {
+                            1
+                        } else {
+                            (term_w as i16 * 3 / 4).max(1)
+                        };
                         scroll_x = (scroll_x - step).max(0);
                     }
                     KeyCode::Right => {
-                        let step = (term_w as i16 * 3 / 4).max(1);
+                        let step = if modifiers.contains(KeyModifiers::CONTROL) {
+                            1
+                        } else {
+                            (term_w as i16 * 3 / 4).max(1)
+                        };
                         scroll_x = (scroll_x + step).min(scroll_max_x);
                     }
                     _ => (),
