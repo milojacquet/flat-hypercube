@@ -1151,7 +1151,17 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                     KeyCode::F(3) => state.rev_unwind(),
                     KeyCode::F(4) => state.rev_commutator(),
                     KeyCode::Char(c) => {
-                        state.process_key(c);
+                        if c == state.prefs.global_keys.rev_start {
+                            state.rev_start();
+                        } else if c == state.prefs.global_keys.rev_stop {
+                            state.rev_stop();
+                        } else if c == state.prefs.global_keys.rev_unwind {
+                            state.rev_unwind();
+                        } else if c == state.prefs.global_keys.rev_commutator {
+                            state.rev_commutator();
+                        } else {
+                            state.process_key(c);
+                        }
                     }
                     KeyCode::Tab => {
                         state.process_key('\t');
