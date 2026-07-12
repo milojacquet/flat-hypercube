@@ -1,7 +1,8 @@
 #![allow(dead_code)]
+use crossterm::event::KeyCode;
 use crossterm::style::Color;
-use serde::de::Error;
 use serde::Deserializer;
+use serde::de::Error;
 use std::fs::File;
 use std::io::BufReader;
 use std::num::ParseIntError;
@@ -10,8 +11,6 @@ use std::path::Path;
 use rgb2ansi256::rgb_to_ansi256;
 use serde::Deserialize;
 
-pub const ESCAPE_CODE: char = '⎋';
-pub const BACKSPACE_CODE: char = '⌫';
 pub const DEFAULT_FILE_PATH_STR: &'static str = "default_prefs.json";
 
 #[derive(Debug, Clone, Deserialize)]
@@ -30,7 +29,7 @@ impl Prefs {
         Ok(serde_json::from_reader(reader)?)
     }
 
-    pub fn pos_keys(&self) -> impl Iterator<Item = char> + '_ {
+    pub fn pos_keys(&self) -> impl Iterator<Item = KeyCode> + '_ {
         self.axes.iter().map(|side| side.pos.keys.select)
     }
 
@@ -47,7 +46,8 @@ impl Prefs {
 pub struct Axis {
     pub pos: Side,
     pub neg: Side,
-    pub axis_key: char,
+    #[serde(deserialize_with = "de_keycode")]
+    pub axis_key: KeyCode,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -60,8 +60,10 @@ pub struct Side {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Keys {
-    pub select: char,
-    pub side: char,
+    #[serde(deserialize_with = "de_keycode")]
+    pub select: KeyCode,
+    #[serde(deserialize_with = "de_keycode")]
+    pub side: KeyCode,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -78,19 +80,32 @@ pub struct GlobalColors {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct GlobalKeys {
-    pub layers: Vec<char>,
-    pub rotate: char,
-    pub scramble: char,
-    pub reset: char,
-    pub keybind_mode: char,
-    pub axis_mode: char,
-    pub undo: char,
-    pub redo: char,
-    pub next_filter: char,
-    pub prev_filter: char,
-    pub live_filter_mode: char,
-    pub reset_mode: char,
-    pub save: char,
+    #[serde(deserialize_with = "de_vec_keycode")]
+    pub layers: Vec<KeyCode>,
+    #[serde(deserialize_with = "de_keycode")]
+    pub rotate: KeyCode,
+    #[serde(deserialize_with = "de_keycode")]
+    pub scramble: KeyCode,
+    #[serde(deserialize_with = "de_keycode")]
+    pub reset: KeyCode,
+    #[serde(deserialize_with = "de_keycode")]
+    pub keybind_mode: KeyCode,
+    #[serde(deserialize_with = "de_keycode")]
+    pub axis_mode: KeyCode,
+    #[serde(deserialize_with = "de_keycode")]
+    pub undo: KeyCode,
+    #[serde(deserialize_with = "de_keycode")]
+    pub redo: KeyCode,
+    #[serde(deserialize_with = "de_keycode")]
+    pub next_filter: KeyCode,
+    #[serde(deserialize_with = "de_keycode")]
+    pub prev_filter: KeyCode,
+    #[serde(deserialize_with = "de_keycode")]
+    pub live_filter_mode: KeyCode,
+    #[serde(deserialize_with = "de_keycode")]
+    pub reset_mode: KeyCode,
+    #[serde(deserialize_with = "de_keycode")]
+    pub save: KeyCode,
 }
 
 fn hex(st: &str) -> Result<Color, ParseIntError> {
@@ -108,4 +123,86 @@ where
 {
     let st = String::deserialize(deserializer)?;
     hex(&st).map_err(D::Error::custom)
+}
+
+fn str_keycode(st: &str) -> Option<KeyCode> {
+    if st.len() == 1 {
+        Some(KeyCode::Char(st.chars().next().unwrap()))
+    } else if let Some(suffix) = st.strip_prefix("F")
+        && let Ok(n) = suffix.parse()
+    {
+        Some(KeyCode::F(n))
+    } else {
+        match st {
+            "Backspace" => Some(KeyCode::Backspace),
+            "Enter" => Some(KeyCode::Enter),
+            "Left" => Some(KeyCode::Left),
+            "Right" => Some(KeyCode::Right),
+            "Up" => Some(KeyCode::Up),
+            "Down" => Some(KeyCode::Down),
+            "Home" => Some(KeyCode::Home),
+            "End" => Some(KeyCode::End),
+            "PageUp" => Some(KeyCode::PageUp),
+            "PageDown" => Some(KeyCode::PageDown),
+            "Tab" => Some(KeyCode::Tab),
+            "BackTab" => Some(KeyCode::BackTab),
+            "Delete" => Some(KeyCode::Delete),
+            "Insert" => Some(KeyCode::Insert),
+            "Null" => Some(KeyCode::Null),
+            "Esc" => Some(KeyCode::Esc),
+            "CapsLock" => Some(KeyCode::CapsLock),
+            "ScrollLock" => Some(KeyCode::ScrollLock),
+            "NumLock" => Some(KeyCode::NumLock),
+            "PrintScreen" => Some(KeyCode::PrintScreen),
+            "Pause" => Some(KeyCode::Pause),
+            "Menu" => Some(KeyCode::Menu),
+            "KeypadBegin" => Some(KeyCode::KeypadBegin),
+            _ => None,
+        }
+    }
+}
+
+fn de_keycode<'de, D>(deserializer: D) -> Result<KeyCode, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let st = String::deserialize(deserializer)?;
+    str_keycode(&st).ok_or(D::Error::custom("not key"))
+}
+
+fn de_vec_keycode<'de, D>(deserializer: D) -> Result<Vec<KeyCode>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let st = Vec::<String>::deserialize(deserializer)?;
+    st.into_iter()
+        .map(|st| str_keycode(&st))
+        .collect::<Option<Vec<_>>>()
+        .ok_or(D::Error::custom("not key"))
+}
+
+fn de_option_keycode<'de, D>(deserializer: D) -> Result<Option<KeyCode>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let st = Option::<String>::deserialize(deserializer)?;
+    match st {
+        None => Ok(None),
+        Some(st) => Ok(Some(str_keycode(&st).ok_or(D::Error::custom("not key"))?)),
+    }
+}
+
+pub fn keycode_name(c: KeyCode) -> String {
+    match c {
+        KeyCode::Char(ch) => ch.to_string(),
+        KeyCode::F(n) => format!("[F{n}]"),
+        _ => format!("[{c}]"),
+    }
+}
+
+pub fn keycode_name_char(c: KeyCode) -> char {
+    match c {
+        KeyCode::Char(c) => c,
+        _ => '□',
+    }
 }

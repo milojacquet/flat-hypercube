@@ -147,7 +147,7 @@
                 "keys":
                 {
                     "select": "n",
-                    "side": "∅"
+                    "side": "Null"
                 }
             },
             "neg":
@@ -157,7 +157,7 @@
                 "keys":
                 {
                     "select": "b",
-                    "side": "∅"
+                    "side": "Null"
                 }
             },
             "axis_key": "p"
@@ -170,7 +170,7 @@
                 "keys":
                 {
                     "select": "q",
-                    "side": "∅"
+                    "side": "Null"
                 }
             },
             "neg":
@@ -180,7 +180,7 @@
                 "keys":
                 {
                     "select": "a",
-                    "side": "∅"
+                    "side": "Null"
                 }
             },
             "axis_key": ";"
@@ -193,7 +193,7 @@
                 "keys":
                 {
                     "select": ",",
-                    "side": "∅"
+                    "side": "Null"
                 }
             },
             "neg":
@@ -203,7 +203,7 @@
                 "keys":
                 {
                     "select": "m",
-                    "side": "∅"
+                    "side": "Null"
                 }
             },
             "axis_key": "["
@@ -216,7 +216,7 @@
                 "keys":
                 {
                     "select": "/",
-                    "side": "∅"
+                    "side": "Null"
                 }
             },
             "neg":
@@ -226,7 +226,7 @@
                 "keys":
                 {
                     "select": ".",
-                    "side": "∅"
+                    "side": "Null"
                 }
             },
             "axis_key": "'"
@@ -256,7 +256,7 @@
         "next_filter": "K",
         "prev_filter": "J",
         "live_filter_mode": "F",
-        "reset_mode": "⎋",
+        "reset_mode": "Esc",
         "save": "S"
     },
     "global_colors":

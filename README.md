@@ -50,6 +50,8 @@ Live filter creation is also supported. To do this, use use <kbd>Shift</kbd>+<kb
 
 The status message can be cleared and mode returned to default by pressing <kbd>Esc</kbd>.
 
+Preferences can be changed by editing `prefs.json`. Key codes are a single character for keys that type that character, `F1`, `F2`, etc. for function keys, and the [crossterm](https://docs.rs/crossterm/0.29.0/crossterm/event/enum.KeyCode.html) names for the keys otherwise.
+
 ## Use as a crate
 
 Flat hypercube can be used as a crate. This funcationality is very rough. Use `AppState::process_key` to process input, `State::make_layout` to make the layout, and the `puzzle` field of `State` to read the current puzzle state.

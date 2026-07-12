@@ -1,19 +1,17 @@
 use crate::filters;
 use crate::filters::Filter;
 use crate::layout::Layout;
-use crate::prefs;
-use crate::prefs::Prefs;
-use crate::prefs::BACKSPACE_CODE;
-use crate::prefs::ESCAPE_CODE;
-use crate::puzzle::{ax, Puzzle, PuzzleTurn, SideTurn, Turn};
+use crate::prefs::{self, keycode_name_char};
+use crate::prefs::{Prefs, keycode_name};
+use crate::puzzle::{Puzzle, PuzzleTurn, SideTurn, Turn, ax};
 use clap::Parser;
 use crossterm::{
-    cursor,
+    ExecutableCommand, QueueableCommand, cursor,
     event::{
         self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseEvent, MouseEventKind,
     },
     style::{self, Stylize},
-    terminal, ExecutableCommand, QueueableCommand,
+    terminal,
 };
 use rand::rngs::ThreadRng;
 use serde::{Deserialize, Serialize};
@@ -90,11 +88,7 @@ impl KeybindSet {
             Self::FixedKey => Self::ThreeKey, //Self::XyzKey,
                                               //Self::XyzKey => Self::ThreeKey,
         };
-        if !next.valid(n) {
-            next.next(n)
-        } else {
-            next
-        }
+        if !next.valid(n) { next.next(n) } else { next }
     }
 
     fn name(&self) -> String {
@@ -149,10 +143,10 @@ pub struct AppState {
     pub puzzle: Puzzle,
     pub scramble: Puzzle,
     pub mode: AppMode,
-    pub current_keys: String,
+    pub current_keys: Vec<KeyCode>,
     pub current_turn: TurnBuild,
     pub alert: u8,
-    pub damage_counter: Option<(char, u8)>,
+    pub damage_counter: Option<(KeyCode, u8)>,
     pub rng: ThreadRng,
     pub keybind_set: KeybindSet,
     pub keybind_axial: KeybindAxial,
@@ -211,7 +205,7 @@ impl AppState {
             puzzle: Puzzle::make_solved(n, d),
             scramble: Puzzle::make_solved(n, d),
             mode: Default::default(),
-            current_keys: "".to_string(),
+            current_keys: Vec::new(),
             current_turn: Default::default(),
             alert: Default::default(),
             damage_counter: Default::default(),
@@ -277,7 +271,7 @@ impl AppState {
     }
 
     fn flush_modes(&mut self) {
-        self.current_keys = "".to_string();
+        self.current_keys = Vec::new();
         self.current_turn = Default::default();
         self.live_filter_string = Default::default();
     }
@@ -287,7 +281,7 @@ impl AppState {
         self.keybind_set == KeybindSet::ThreeKeyStrict && self.current_turn.side.is_some()
     }
 
-    fn get_side(&self, c: char) -> Option<i16> {
+    fn get_side(&self, c: KeyCode) -> Option<i16> {
         self.prefs
             .axes
             .iter()
@@ -306,7 +300,7 @@ impl AppState {
         Layout::make_layout(self.puzzle.n, self.puzzle.d, compact, vertical).move_right(1)
     }
 
-    pub fn process_key(&mut self, c: char) {
+    pub fn process_key(&mut self, c: KeyCode) {
         self.message = None;
         if c == self.prefs.global_keys.scramble || c == self.prefs.global_keys.reset {
             match self.damage_counter {
@@ -480,7 +474,7 @@ impl AppState {
                                             let key_removal = if strict { 3 } else { 2 };
                                             self.current_keys = self.current_keys
                                                 [..self.current_keys.len() - key_removal]
-                                                .to_string();
+                                                .to_vec();
                                         }
                                         self.current_turn.from = None;
                                         if strict {
@@ -601,7 +595,7 @@ impl AppState {
                                             self.current_keys =
                                                 self.current_keys[..self.current_keys.len()
                                                     - self.current_turn.fixed.len()]
-                                                    .to_string();
+                                                    .to_vec();
                                         }
                                         self.current_turn.fixed = vec![];
                                     }
@@ -612,8 +606,10 @@ impl AppState {
                 }
 
                 AppMode::LiveFilter => {
-                    if c == '+' || c == '!' {
-                        self.live_filter_string.push(c);
+                    if let KeyCode::Char(ch) = c
+                        && (ch == '+' || ch == '!')
+                    {
+                        self.live_filter_string.push(ch);
                     } else if let Some((s, side)) = self
                         .prefs
                         .axes
@@ -636,18 +632,21 @@ impl AppState {
                             return;
                         }
                         self.live_filter_string.push(side.name);
-                    } else if self
-                        .prefs
-                        .axes
-                        .iter()
-                        .any(|ax| ax.pos.name == c || ax.neg.name == c)
+                    } else if let KeyCode::Char(ch) = c
+                        && (self
+                            .prefs
+                            .axes
+                            .iter()
+                            .any(|ax| ax.pos.name == ch || ax.neg.name == ch))
                     {
-                        self.live_filter_string.push(c);
-                    } else if let Some(ind) = filters::DIGITS.chars().position(|ch| c == ch) {
+                        self.live_filter_string.push(ch);
+                    } else if let KeyCode::Char(cc) = c
+                        && let Some(ind) = filters::DIGITS.chars().position(|ch| cc == ch)
+                    {
                         if ind <= self.puzzle.d as usize {
-                            self.live_filter_string.push(c);
+                            self.live_filter_string.push(cc);
                         }
-                    } else if c == BACKSPACE_CODE {
+                    } else if c == KeyCode::Backspace {
                         self.live_filter_string.pop();
                     }
 
@@ -657,7 +656,7 @@ impl AppState {
                         self.live_filter_pending = filter.clone();
                     }
 
-                    if c == '\n' {
+                    if c == KeyCode::Enter {
                         if let Err(err) = filter_result {
                             self.message = Some(err);
                         } else {
@@ -672,7 +671,7 @@ impl AppState {
         }
     }
 
-    fn get_axis_key(&self, c: char) -> Option<i16> {
+    fn get_axis_key(&self, c: KeyCode) -> Option<i16> {
         if self.keybind_set == KeybindSet::ThreeKeyStrict {
             return None;
         }
@@ -767,7 +766,12 @@ impl AppState {
             return message.to_string();
         }
         match self.mode {
-            AppMode::Turn => self.current_keys.clone(),
+            AppMode::Turn => self
+                .current_keys
+                .iter()
+                .map(|c| keycode_name(*c))
+                .collect::<Vec<_>>()
+                .join(""),
             AppMode::LiveFilter => format!("live filter: {}", self.live_filter_string),
         }
     }
@@ -929,22 +933,9 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                     KeyCode::Char('c') if modifiers.contains(KeyModifiers::CONTROL) => {
                         break 'event;
                     }
-                    KeyCode::Char(c) => {
-                        state.process_key(c);
+                    _ => {
+                        state.process_key(code);
                     }
-                    KeyCode::Tab => {
-                        state.process_key('\t');
-                    }
-                    KeyCode::Esc => {
-                        state.process_key(ESCAPE_CODE);
-                    }
-                    KeyCode::Enter => {
-                        state.process_key('\n');
-                    }
-                    KeyCode::Backspace => {
-                        state.process_key(BACKSPACE_CODE);
-                    }
-                    _ => (),
                 },
                 Event::Mouse(MouseEvent {
                     kind, column, row, ..
@@ -1093,27 +1084,25 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                     || (state.keybind_set == KeybindSet::FixedKey && state.puzzle.d == 3)
                     || state.keybind_set == KeybindSet::ThreeKeyStrict
                 {
-                    if *side >= 0 {
+                    keycode_name_char(if *side >= 0 {
                         state.prefs.axes[*side as usize].pos.keys.select
                     } else {
                         state.prefs.axes[(!side) as usize].neg.keys.select
-                    }
+                    })
                 } else {
                     match state.keybind_axial {
                         KeybindAxial::Axial => {
                             if *side >= 0 {
-                                state.prefs.axes[*side as usize].axis_key
+                                keycode_name_char(state.prefs.axes[*side as usize].axis_key)
                             } else {
                                 '·'
                             }
                         }
-                        KeybindAxial::Side => {
-                            if *side >= 0 {
-                                state.prefs.axes[*side as usize].pos.keys.side
-                            } else {
-                                state.prefs.axes[(!side) as usize].neg.keys.side
-                            }
-                        }
+                        KeybindAxial::Side => keycode_name_char(if *side >= 0 {
+                            state.prefs.axes[*side as usize].pos.keys.side
+                        } else {
+                            state.prefs.axes[(!side) as usize].neg.keys.side
+                        }),
                     }
                 };
                 color = state.prefs.global_colors.piece;
