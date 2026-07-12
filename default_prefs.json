@@ -257,7 +257,11 @@
         "prev_filter": "J",
         "live_filter_mode": "F",
         "reset_mode": "Esc",
-        "save": "S"
+        "save": "S",
+        "sections":
+        [
+            ["PageDown", "PageUp"]
+        ]
     },
     "global_colors":
     {

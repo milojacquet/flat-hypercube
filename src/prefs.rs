@@ -106,6 +106,8 @@ pub struct GlobalKeys {
     pub reset_mode: KeyCode,
     #[serde(deserialize_with = "de_keycode")]
     pub save: KeyCode,
+    #[serde(deserialize_with = "de_vec_vec_keycode")]
+    pub sections: Vec<Vec<KeyCode>>,
 }
 
 fn hex(st: &str) -> Result<Color, ParseIntError> {
@@ -177,6 +179,21 @@ where
     let st = Vec::<String>::deserialize(deserializer)?;
     st.into_iter()
         .map(|st| str_keycode(&st))
+        .collect::<Option<Vec<_>>>()
+        .ok_or(D::Error::custom("not key"))
+}
+
+fn de_vec_vec_keycode<'de, D>(deserializer: D) -> Result<Vec<Vec<KeyCode>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let st = Vec::<Vec<String>>::deserialize(deserializer)?;
+    st.into_iter()
+        .map(|v| {
+            v.into_iter()
+                .map(|st| str_keycode(&st))
+                .collect::<Option<Vec<_>>>()
+        })
         .collect::<Option<Vec<_>>>()
         .ok_or(D::Error::custom("not key"))
 }

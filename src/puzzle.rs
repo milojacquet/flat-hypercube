@@ -206,6 +206,14 @@ impl Puzzle {
         }
     }
 
+    pub fn is_piece(&self, piece: &[i16]) -> bool {
+        piece.iter().filter(|x| x.abs() == self.n).count() <= 1
+    }
+
+    pub fn is_sticker(&self, piece: &[i16]) -> bool {
+        piece.iter().filter(|x| x.abs() == self.n).count() == 1
+    }
+
     pub fn piece_body(&self, piece: &[i16]) -> Vec<i16> {
         if let Some(ind) = piece.iter().position(|x| x.abs() == self.n) {
             let mut piece_body = piece.to_vec();
@@ -240,7 +248,7 @@ impl Puzzle {
         colors
     }
 
-    pub fn stickers(&self, piece: &[i16]) -> Vec<i16> {
+    pub fn piece_stickers(&self, piece: &[i16]) -> Vec<i16> {
         self.piece_body_stickers(&self.piece_body(piece))
     }
 

@@ -161,6 +161,7 @@ pub struct AppState {
     pub live_filter: Filter,
     pub hovered: Option<(i16, i16)>,
     pub clicked: Vec<Vec<i16>>,
+    pub section: Vec<i16>,
     pub filename: PathBuf,
     pub prefs: Prefs,
 }
@@ -223,9 +224,14 @@ impl AppState {
             live_filter_pending: Default::default(),
             hovered: None,
             clicked: Vec::new(),
+            section: Vec::new(),
             filename: Self::new_filename(),
             prefs,
         })
+    }
+
+    fn set_section(&mut self, section: usize) {
+        self.section = vec![(self.puzzle.n + 1) % 2; section];
     }
 
     fn to_app_log(&self) -> AppLog {
@@ -297,7 +303,13 @@ impl AppState {
     }
 
     pub fn make_layout(&self, compact: bool, vertical: bool) -> Layout {
-        Layout::make_layout(self.puzzle.n, self.puzzle.d, compact, vertical).move_right(1)
+        Layout::make_layout(
+            self.puzzle.n,
+            self.puzzle.d - self.section.len() as u16,
+            compact,
+            vertical,
+        )
+        .move_right(1)
     }
 
     pub fn process_key(&mut self, c: KeyCode) {
@@ -346,6 +358,36 @@ impl AppState {
                 Ok(()) => self.message = Some(format!("saved to {}", self.filename.display())),
                 //Err(err) => self.message = Some(format!("could not save: {}", err)),
                 Err(_err) => self.message = Some("could not save".to_string()),
+            }
+        } else if let Some((d, i)) = self
+            .prefs
+            .global_keys
+            .sections
+            .iter()
+            .enumerate()
+            .filter_map(|(d, ks)| Some((d, ks.iter().position(|k| *k == c)?)))
+            .next()
+        {
+            let sign = (i as i16).min(1) * 2 - 1;
+            if let Some(sec) = self.section.get_mut(d) {
+                *sec *= sign;
+                *sec += if *sec == -self.puzzle.n || *sec == self.puzzle.n - 1 {
+                    1
+                } else if *sec == self.puzzle.n {
+                    0
+                } else {
+                    2
+                };
+                *sec *= sign;
+
+                self.message = Some(format!(
+                    "section: [{}]",
+                    self.section
+                        .iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ))
             }
         } else {
             match self.mode {
@@ -868,6 +910,10 @@ struct Args {
     #[arg(long)]
     boxes: bool,
 
+    /// Number of dimensions to cut by
+    #[arg(short, long, default_value("0"))]
+    section: usize,
+
     /// Preferences file
     #[arg(short, long)]
     prefs: Option<PathBuf>,
@@ -893,6 +939,8 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         state = AppState::new(args.n, args.d, prefs)?;
     }
+
+    state.set_section(args.section);
 
     if let Some(path) = args.filters {
         let filters_str = std::fs::read_to_string(path).expect("Invalid filter file");
@@ -1003,6 +1051,16 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
 
         for ((x, y), pos) in &layout.points {
             // in this loop we are more efficient by not flushing the buffer.
+
+            let mut pos = pos.clone();
+            pos.extend(state.section.iter());
+            if !state.puzzle.is_piece(&pos) {
+                stdout
+                    .queue(cursor::MoveTo(*x as u16, *y as u16))?
+                    .queue(style::Print(' '))?;
+                continue;
+            }
+
             let ch;
             let color;
             let filter = if matches!(state.mode, AppMode::LiveFilter) {
@@ -1015,10 +1073,10 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                 &Default::default()
             };
 
-            let in_filter = filter.matches_stickers(&state.puzzle.stickers(pos));
+            let in_filter = filter.matches_stickers(&state.puzzle.piece_stickers(&pos));
 
             if pos.iter().any(|x| x.abs() == state.puzzle.n) {
-                let side = state.puzzle.stickers[pos];
+                let side = state.puzzle.stickers[&pos];
                 ch = if args.boxes {
                     '■'
                 } else if side >= 0 {
@@ -1053,11 +1111,11 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                     .queue(style::PrintStyledContent(ch.with(color)))?;
             }
 
-            if previous_clicked_stickers.get(pos) != clicked_stickers.get(pos) {
+            if previous_clicked_stickers.get(&pos) != clicked_stickers.get(&pos) {
                 erase_locs.insert((*x, *y));
             }
 
-            if let Some(style) = clicked_stickers.get(pos) {
+            if let Some(style) = clicked_stickers.get(&pos) {
                 clicked_locs
                     .get_mut(style)
                     .expect("contains")
@@ -1076,6 +1134,12 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         for ((x, y), side) in &layout.keybind_hints {
+            let mut pos = layout.points[&(*x, *y)].clone();
+            pos.extend(state.section.iter());
+            if state.puzzle.is_sticker(&pos) {
+                continue;
+            }
+
             // in this loop we are more efficient by not flushing the buffer.
             let ch;
             let color;
