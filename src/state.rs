@@ -962,10 +962,11 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
 
     let stdout_manager = StdoutManager;
 
+    let mut persistent_clicked_locs = HashMap::new();
+
     'event: loop {
         let previous_message = state.get_message();
         let previous_hovered = state.hovered;
-        let previous_clicked_stickers = state.clicked_stickers();
         let mut just_resized = false;
 
         let frame_begin = Instant::now();
@@ -991,6 +992,10 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                     let key = (column as i16, row as i16);
                     let sticker = layout.points.get(&key);
                     if let Some(sticker) = sticker {
+                        let mut sticker = sticker.clone();
+                        sticker.extend(state.section.iter());
+                        let sticker = sticker;
+
                         match kind {
                             MouseEventKind::Down(_button) => {
                                 let original_length = state.clicked.len();
@@ -1043,10 +1048,9 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         let clicked_stickers = state.clicked_stickers();
-        let mut erase_locs = HashSet::new();
         let mut clicked_locs: HashMap<_, _> = CLICKED_STYLES
             .into_iter()
-            .map(|s| (s, HashSet::new()))
+            .map(|s| (*s, HashSet::new()))
             .collect();
 
         for ((x, y), pos) in &layout.points {
@@ -1111,10 +1115,6 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                     .queue(style::PrintStyledContent(ch.with(color)))?;
             }
 
-            if previous_clicked_stickers.get(&pos) != clicked_stickers.get(&pos) {
-                erase_locs.insert((*x, *y));
-            }
-
             if let Some(style) = clicked_stickers.get(&pos) {
                 clicked_locs
                     .get_mut(style)
@@ -1123,8 +1123,10 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
-        for (x, y) in erase_locs {
-            erase_brackets(&mut stdout, x, y)?;
+        for pcl in persistent_clicked_locs.values() {
+            for &(x, y) in pcl {
+                erase_brackets(&mut stdout, x, y)?;
+            }
         }
 
         for style in CLICKED_STYLES {
@@ -1190,6 +1192,8 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
             std::thread::sleep(FRAME_LENGTH - frame);
         }
         //state.puzzle.turn(0, 2, 2, 1); // R
+
+        persistent_clicked_locs = clicked_locs;
     }
 
     drop(stdout_manager);
