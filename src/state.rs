@@ -401,14 +401,10 @@ impl AppState {
                         self.keybind_set = self.keybind_set.next(self.puzzle.n);
                         self.message = Some(format!("set keybinds to {}", self.keybind_set.name()))
                     } else if c == self.prefs.global_keys.axis_mode {
-                        if self.puzzle.d > 6 {
-                            self.message = Some("not enough room for side keybinds".to_string());
-                        } else {
-                            self.flush_modes();
-                            self.keybind_axial = self.keybind_axial.next();
-                            self.message =
-                                Some(format!("set axis mode to {}", self.keybind_axial.name()))
-                        }
+                        self.flush_modes();
+                        self.keybind_axial = self.keybind_axial.next();
+                        self.message =
+                            Some(format!("set axis mode to {}", self.keybind_axial.name()))
                     } else if c == self.prefs.global_keys.undo {
                         self.flush_modes();
                         let undid = self.undo_history.pop();
@@ -532,10 +528,8 @@ impl AppState {
                         }
                         KeybindSet::FixedKey if self.puzzle.d == 3 => {
                             let flip;
-                            if let Some(s) =
-                                self.prefs.axes.iter().position(|ax| ax.pos.keys.side == c)
-                            {
-                                let s = Side(s as i16);
+                            if let Some(axis) = self.prefs.axis_with(|ax| ax.pos.keys.side == c) {
+                                let s = axis.pos_side();
                                 if !self.has_side(s) {
                                     return;
                                 }
@@ -548,10 +542,10 @@ impl AppState {
                                 self.current_turn.side = Some(s);
                                 flip = true;
                                 just_pressed_side = true;
-                            } else if let Some(s) =
-                                self.prefs.axes.iter().position(|ax| ax.neg.keys.side == c)
+                            } else if let Some(axis) =
+                                self.prefs.axis_with(|ax| ax.neg.keys.side == c)
                             {
-                                let s = Side(s as i16).opposite();
+                                let s = axis.neg_side();
                                 if !self.has_side(s) {
                                     return;
                                 }
