@@ -1,4 +1,6 @@
 #![allow(dead_code)]
+use crate::puzzle::Axis;
+use crate::puzzle::Side;
 use crossterm::event::KeyCode;
 use crossterm::style::Color;
 use serde::Deserializer;
@@ -15,7 +17,7 @@ pub const DEFAULT_FILE_PATH_STR: &'static str = "default_prefs.json";
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Prefs {
-    pub axes: Vec<Axis>,
+    pub axes: Vec<PrefAxis>,
     pub global_keys: GlobalKeys,
     pub global_colors: GlobalColors,
     pub damage_repeat: u8,
@@ -33,25 +35,42 @@ impl Prefs {
         self.axes.iter().map(|side| side.pos.keys.select)
     }
 
-    pub fn max_dim(&self) -> u16 {
-        self.axes.len() as u16
+    pub fn max_dim(&self) -> i16 {
+        self.axes.len() as i16
     }
 
     pub fn max_layers(&self) -> i16 {
         (self.global_keys.layers.len() * 2 + 1) as i16
     }
+
+    pub fn axis_with(&self, f: impl Fn(&PrefAxis) -> bool) -> Option<Axis> {
+        Some(Axis(self.axes.iter().position(f)? as i16))
+    }
+
+    pub fn axis_prefs(&self, axis: Axis) -> &PrefAxis {
+        &self.axes[axis.0 as usize]
+    }
+
+    pub fn side_prefs(&self, side: Side) -> &PrefSide {
+        let axis_prefs = self.axis_prefs(side.axis());
+        if side.is_pos() {
+            &axis_prefs.pos
+        } else {
+            &axis_prefs.neg
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct Axis {
-    pub pos: Side,
-    pub neg: Side,
+pub struct PrefAxis {
+    pub pos: PrefSide,
+    pub neg: PrefSide,
     #[serde(deserialize_with = "de_keycode")]
     pub axis_key: KeyCode,
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct Side {
+pub struct PrefSide {
     pub name: char,
     #[serde(deserialize_with = "de_color")]
     pub color: Color,

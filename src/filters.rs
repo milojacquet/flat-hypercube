@@ -1,10 +1,11 @@
 use crate::prefs::Prefs;
+use crate::puzzle::Side;
 
 pub const DIGITS: &'static str = "0123456789&";
 
 #[derive(Debug, Clone)]
 enum FilterSelector {
-    Side(i16),   // color
+    Side(Side),  // color
     Type(usize), // number of stickers
 }
 
@@ -54,15 +55,15 @@ impl Filter {
                         continue;
                     }
 
-                    if let Some(ind) = prefs.axes.iter().position(|ax| ax.pos.name == ch) {
+                    if let Some(ind) = prefs.axis_with(|ax| ax.pos.name == ch) {
                         filter_sides.push(FilterSelectorBool {
                             have,
-                            selector: FilterSelector::Side(ind as i16),
+                            selector: FilterSelector::Side(ind.pos_side()),
                         });
-                    } else if let Some(ind) = prefs.axes.iter().position(|ax| ax.neg.name == ch) {
+                    } else if let Some(ind) = prefs.axis_with(|ax| ax.neg.name == ch) {
                         filter_sides.push(FilterSelectorBool {
                             have,
-                            selector: FilterSelector::Side(!(ind as i16)),
+                            selector: FilterSelector::Side(ind.neg_side()),
                         });
                     } else if let Some(ind) = DIGITS.chars().position(|c| c == ch) {
                         filter_sides.push(FilterSelectorBool {
@@ -88,7 +89,7 @@ impl Filter {
 }
 
 impl FilterSelector {
-    fn matches_stickers(&self, colors: &[i16]) -> bool {
+    fn matches_stickers(&self, colors: &[Side]) -> bool {
         match self {
             FilterSelector::Side(color) => colors.iter().any(|e| e == color),
             FilterSelector::Type(n) => colors.len() == *n,
@@ -97,7 +98,7 @@ impl FilterSelector {
 }
 
 impl Filter {
-    pub fn matches_stickers(&self, colors: &[i16]) -> bool {
+    pub fn matches_stickers(&self, colors: &[Side]) -> bool {
         self.0.iter().any(|sides| {
             sides
                 .iter()

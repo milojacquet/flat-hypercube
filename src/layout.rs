@@ -1,70 +1,101 @@
+use crate::puzzle::Position;
+use crate::puzzle::Side;
 use std::collections::HashMap;
 use std::iter::once;
 
 const GAPS: &[i16] = &[0, 1, 0, 2, 1, 10, 4, 40, 18, 160, 72];
 const GAPS_COMPACT: &[i16] = &[0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0];
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ScreenLocation {
+    pub x: i16,
+    pub y: i16,
+}
+
+impl ScreenLocation {
+    pub fn new(x: i16, y: i16) -> Self {
+        Self { x, y }
+    }
+
+    fn shift_x(self, shift: i16) -> Self {
+        Self {
+            x: self.x + shift,
+            y: self.y,
+        }
+    }
+
+    fn shift_y(self, shift: i16) -> Self {
+        Self {
+            x: self.x,
+            y: self.y + shift,
+        }
+    }
+
+    fn max(self, other: Self) -> Self {
+        Self {
+            x: self.x.max(other.x),
+            y: self.y.max(other.y),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Layout {
-    pub width: u16,
-    pub height: u16,
-    pub points: HashMap<(i16, i16), Vec<i16>>,
-    pub keybind_hints: HashMap<(i16, i16), Option<i16>>, // None: core, Some(i): side i
+    pub dimensions: ScreenLocation,
+    pub points: HashMap<ScreenLocation, Position>,
+    pub keybind_hints: HashMap<ScreenLocation, Option<Side>>, // None: core, Some(i): side i
 }
 
 impl Layout {
     fn new() -> Self {
         Layout {
-            width: 0,
-            height: 0,
+            dimensions: ScreenLocation::new(0, 0),
             points: HashMap::new(),
             keybind_hints: HashMap::new(),
         }
     }
 
     fn squish_right(&mut self) -> &mut Self {
-        self.width = (self.points.keys().map(|(x, _y)| x).max().unwrap_or(&-1) + 1) as u16;
+        self.dimensions.x = (self.points.keys().map(|loc| loc.x).max().unwrap_or(-1) + 1) as i16;
         self
     }
 
     fn squish_bottom(&mut self) -> &mut Self {
-        self.height = (self.points.keys().map(|(_x, y)| y).max().unwrap_or(&-1) + 1) as u16;
+        self.dimensions.y = (self.points.keys().map(|loc| loc.y).max().unwrap_or(-1) + 1) as i16;
         self
     }
 
     pub fn move_right(self, shift: i16) -> Self {
         let mut out = Self::new();
-        for ((x, y), val) in &self.points {
-            out.points.insert((x + shift, *y), val.to_vec());
+        for (loc, val) in &self.points {
+            out.points.insert(loc.shift_x(shift), val.clone());
         }
-        for ((x, y), val) in &self.keybind_hints {
-            out.keybind_hints.insert((x + shift, *y), *val);
+        for (loc, val) in &self.keybind_hints {
+            out.keybind_hints.insert(loc.shift_x(shift), *val);
         }
-        out.width = (self.width as i16 + shift) as u16;
-        out.height = self.height;
+        out.dimensions = self.dimensions.shift_x(shift);
         out
     }
 
     fn move_down(self, shift: i16) -> Self {
         let mut out = Self::new();
-        for ((x, y), val) in &self.points {
-            out.points.insert((*x, y + shift), val.to_vec());
+        for (loc, val) in &self.points {
+            out.points.insert(loc.shift_y(shift), val.clone());
         }
-        for ((x, y), val) in &self.keybind_hints {
-            out.keybind_hints.insert((*x, y + shift), *val);
+        for (loc, val) in &self.keybind_hints {
+            out.keybind_hints.insert(loc.shift_y(shift), *val);
         }
-        out.width = self.width;
-        out.height = (self.height as i16 + shift) as u16;
+        out.dimensions = self.dimensions.shift_y(shift);
         out
     }
 
     fn squish_left(self) -> Self {
-        let shift = -self.points.keys().map(|(x, _y)| x).min().unwrap_or(&0);
+        let shift = -self.points.keys().map(|loc| loc.x).min().unwrap_or(0);
         self.move_right(shift)
     }
 
     fn squish_top(self) -> Self {
-        let shift = -self.points.keys().map(|(_x, y)| y).min().unwrap_or(&0);
+        let shift = -self.points.keys().map(|loc| loc.y).min().unwrap_or(0);
         self.move_down(shift)
     }
 
@@ -85,20 +116,19 @@ impl Layout {
         self.squish_horiz().squish_vert()
     }
 
-    fn union(&mut self, other: Self) -> &mut Self {
+    fn combine(&mut self, other: Self) -> &mut Self {
         self.points.extend(other.points);
         self.keybind_hints.extend(other.keybind_hints);
-        self.width = self.width.max(other.width);
-        self.height = self.height.max(other.height);
+        self.dimensions = self.dimensions.max(other.dimensions);
         self
     }
 
     fn join_horiz(&mut self, other: Self, gap: i16) -> &mut Self {
-        self.union(other.move_right(self.width as i16 + gap))
+        self.combine(other.move_right(self.dimensions.x + gap))
     }
 
     fn join_vert(&mut self, other: Self, gap: i16) -> &mut Self {
-        self.union(other.move_down(self.height as i16 + gap))
+        self.combine(other.move_down(self.dimensions.y + gap))
     }
 
     fn concat_horiz(mut layouts: Vec<Self>, gap: i16) -> Self {
@@ -127,28 +157,27 @@ impl Layout {
 
     fn clean(mut self, n: i16) -> Self {
         self.points
-            .retain(|_key, val| val.iter().filter(|x| x.abs() == n).count() <= 1);
+            .retain(|_key, val| val.position_type(n).is_some());
         self
     }
 
     fn push_all(self, x: i16) -> Self {
         let mut lower = self.clone();
         for (_xy, ref mut pos) in lower.points.iter_mut() {
-            pos.push(x);
+            pos.0.push(x);
         }
         lower
     }
 
-    pub fn make_layout(n: i16, d: u16, compact: bool, vertical: bool) -> Layout {
+    pub fn make_layout(n: i16, d: i16, compact: bool, vertical: bool) -> Layout {
         let gaps = if compact { GAPS_COMPACT } else { GAPS };
 
         if d == 0 {
             Layout {
-                width: 1,
-                height: 1,
-                points: HashMap::from([((0, 0), vec![])]),
+                dimensions: ScreenLocation::new(1, 1),
+                points: HashMap::from([(ScreenLocation::new(0, 0), Position(vec![]))]),
                 keybind_hints: if n > 2 {
-                    HashMap::from([((0, 0), None)])
+                    HashMap::from([(ScreenLocation::new(0, 0), None)])
                 } else {
                     HashMap::new()
                 },
@@ -156,7 +185,7 @@ impl Layout {
         } else {
             let make_horizontal = d % 2 == 1 && !vertical;
 
-            let lower = Self::make_layout(n, ((d as i16) - 1) as u16, compact, false);
+            let lower = Self::make_layout(n, ((d as i16) - 1) as i16, compact, false);
             let mut row = vec![];
 
             for i in once(-n).chain((-n + 1..n).step_by(2)).chain(once(n)) {
@@ -173,10 +202,10 @@ impl Layout {
                     let keep;
                     if i == -n + 1 {
                         keep = side.is_none();
-                        *side = Some(!((d - 1) as i16));
+                        *side = Some(Side((d - 1) as i16).opposite());
                     } else if i == n - 1 {
                         keep = side.is_none();
-                        *side = Some((d - 1) as i16);
+                        *side = Some(Side((d - 1) as i16));
                     } else {
                         keep = i == 0 || i == 1
                     };

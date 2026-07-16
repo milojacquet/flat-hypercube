@@ -1,9 +1,11 @@
 use crate::filters;
 use crate::filters::Filter;
-use crate::layout::Layout;
+use crate::layout::{Layout, ScreenLocation};
 use crate::prefs::{self, keycode_name_char};
 use crate::prefs::{Prefs, keycode_name};
-use crate::puzzle::{Puzzle, PuzzleTurn, SideTurn, Turn, ax};
+use crate::puzzle::Position;
+use crate::puzzle::{Axis, Side};
+use crate::puzzle::{Puzzle, PuzzleTurn, SideTurn, Turn};
 use clap::Parser;
 use crossterm::{
     ExecutableCommand, QueueableCommand, cursor,
@@ -35,9 +37,9 @@ pub enum TurnLayer {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct TurnBuild {
     pub layer: Option<TurnLayer>,
-    pub side: Option<i16>,
-    pub from: Option<i16>,
-    pub fixed: Vec<i16>,
+    pub side: Option<Side>,
+    pub from: Option<Side>,
+    pub fixed: Vec<Side>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -66,9 +68,9 @@ impl KeybindAxial {
 pub enum KeybindSet {
     ThreeKey,       // MC7D, works in d dimensions, depends on axial flag
     ThreeKeyStrict, // MC7D, works in d dimensions, only uses one set of keys for the facets
-    FixedKey,       // works in d dimensions, requires d-2 keypresses, depends on axial flag
-                    // has addition inversion keys in 3d
-                    //XyzKey, // HSC, 4d only
+    FixedKey,       /* works in d dimensions, requires d-2 keypresses, depends on axial flag
+                     * has addition inversion keys in 3d
+                     *XyzKey, // HSC, 4d only */
 }
 
 impl KeybindSet {
@@ -85,8 +87,8 @@ impl KeybindSet {
         let next = match self {
             Self::ThreeKey => Self::ThreeKeyStrict,
             Self::ThreeKeyStrict => Self::FixedKey,
-            Self::FixedKey => Self::ThreeKey, //Self::XyzKey,
-                                              //Self::XyzKey => Self::ThreeKey,
+            Self::FixedKey => Self::ThreeKey, /*Self::XyzKey,
+                                               *Self::XyzKey => Self::ThreeKey, */
         };
         if !next.valid(n) { next.next(n) } else { next }
     }
@@ -159,8 +161,8 @@ pub struct AppState {
     pub live_filter_string: String,
     pub live_filter_pending: Filter,
     pub live_filter: Filter,
-    pub hovered: Option<(i16, i16)>,
-    pub clicked: Vec<Vec<i16>>,
+    pub hovered: Option<ScreenLocation>,
+    pub clicked: Vec<Position>,
     pub section: Vec<i16>,
     pub filename: PathBuf,
     pub prefs: Prefs,
@@ -173,7 +175,7 @@ struct AppLog {
 }
 
 impl AppState {
-    fn new(n: Option<i16>, d: Option<u16>, prefs: Prefs) -> Result<Self, String> {
+    fn new(n: Option<i16>, d: Option<i16>, prefs: Prefs) -> Result<Self, String> {
         let Some(n) = n else {
             return Err("n must be specified".into());
         };
@@ -287,25 +289,25 @@ impl AppState {
         self.keybind_set == KeybindSet::ThreeKeyStrict && self.current_turn.side.is_some()
     }
 
-    fn get_side(&self, c: KeyCode) -> Option<i16> {
+    fn get_side(&self, c: KeyCode) -> Option<Side> {
         self.prefs
             .axes
             .iter()
             .position(|ax| ax.pos.keys.select == c)
-            .map(|s| s as i16)
+            .map(|s| Side(s as i16))
             .or_else(|| {
                 self.prefs
                     .axes
                     .iter()
                     .position(|ax| ax.neg.keys.select == c)
-                    .map(|s| !(s as i16))
+                    .map(|s| Side(s as i16).opposite())
             })
     }
 
     pub fn make_layout(&self, compact: bool, vertical: bool) -> Layout {
         Layout::make_layout(
             self.puzzle.n,
-            self.puzzle.d - self.section.len() as u16,
+            self.puzzle.d - self.section.len() as i16,
             compact,
             vertical,
         )
@@ -461,7 +463,7 @@ impl AppState {
                     } else if !self.awaiting_side_as_axis()
                         && let Some(s) = self.get_side(c)
                     {
-                        if s.max(!s) as u16 >= self.puzzle.d {
+                        if !self.has_side(s) {
                             return;
                         }
                         if self.current_turn.layer.is_none() || self.current_turn.side.is_some() {
@@ -494,7 +496,7 @@ impl AppState {
                                 && !(strict && just_pressed_side)
                                 && let Some(s) = axis
                             {
-                                if ax(s) as u16 >= self.puzzle.d {
+                                if !self.has_side(s) {
                                     return;
                                 }
                                 self.current_keys.push(c);
@@ -502,7 +504,7 @@ impl AppState {
                                 let side = if self.current_turn.side.is_some() {
                                     self.current_turn.side
                                 } else if self.current_turn.layer == Some(TurnLayer::WholePuzzle) {
-                                    Some(0) // dummy value
+                                    Some(Side(0)) // dummy value
                                 } else {
                                     None
                                 };
@@ -533,7 +535,8 @@ impl AppState {
                             if let Some(s) =
                                 self.prefs.axes.iter().position(|ax| ax.pos.keys.side == c)
                             {
-                                if ax(s as i16) as u16 >= self.puzzle.d {
+                                let s = Side(s as i16);
+                                if !self.has_side(s) {
                                     return;
                                 }
                                 if self.current_turn.layer.is_none()
@@ -542,13 +545,14 @@ impl AppState {
                                     self.flush_modes();
                                 }
                                 self.current_keys.push(c);
-                                self.current_turn.side = Some(s as i16);
+                                self.current_turn.side = Some(s);
                                 flip = true;
                                 just_pressed_side = true;
                             } else if let Some(s) =
                                 self.prefs.axes.iter().position(|ax| ax.neg.keys.side == c)
                             {
-                                if ax(s as i16) as u16 >= self.puzzle.d {
+                                let s = Side(s as i16).opposite();
+                                if !self.has_side(s) {
                                     return;
                                 }
                                 if self.current_turn.layer.is_none()
@@ -557,7 +561,7 @@ impl AppState {
                                     self.flush_modes();
                                 }
                                 self.current_keys.push(c);
-                                self.current_turn.side = Some(!(s as i16));
+                                self.current_turn.side = Some(s);
                                 flip = true;
                                 just_pressed_side = true;
                             } else {
@@ -567,15 +571,31 @@ impl AppState {
                             if let (Some(side), true) = (self.current_turn.side, just_pressed_side)
                             {
                                 if flip {
-                                    if side < 0 {
-                                        self.perform_turn(side, (!side + 1) % 3, (!side + 2) % 3);
+                                    if side.is_pos() {
+                                        self.perform_turn(
+                                            side,
+                                            side.map(|s| (s + 2) % 3),
+                                            side.map(|s| (s + 1) % 3),
+                                        );
                                     } else {
-                                        self.perform_turn(side, (side + 2) % 3, (side + 1) % 3);
+                                        self.perform_turn(
+                                            side,
+                                            side.map(|s| (!s + 1) % 3),
+                                            side.map(|s| (!s + 2) % 3),
+                                        );
                                     }
-                                } else if side < 0 {
-                                    self.perform_turn(side, (!side + 2) % 3, (!side + 1) % 3);
+                                } else if side.is_pos() {
+                                    self.perform_turn(
+                                        side,
+                                        side.map(|s| (s + 1) % 3),
+                                        side.map(|s| (s + 2) % 3),
+                                    );
                                 } else {
-                                    self.perform_turn(side, (side + 1) % 3, (side + 2) % 3);
+                                    self.perform_turn(
+                                        side,
+                                        side.map(|s| (!s + 2) % 3),
+                                        side.map(|s| (!s + 1) % 3),
+                                    );
                                 }
                             }
                         }
@@ -583,7 +603,7 @@ impl AppState {
                             let axis = self.get_axis_key(c);
 
                             if let Some(s) = axis {
-                                if ax(s) as u16 >= self.puzzle.d {
+                                if !self.has_side(s) {
                                     return;
                                 }
                                 self.current_keys.push(c);
@@ -596,16 +616,16 @@ impl AppState {
                                         axes.extend(self.current_turn.fixed.iter().cloned());
 
                                         for axis in &mut axes {
-                                            if *axis < 0 {
+                                            if !axis.is_pos() {
                                                 sign = !sign;
-                                                *axis = !*axis;
+                                                *axis = *&axis.opposite();
                                             }
                                         }
                                         //self.message = format!("{:?}", axes).into();
 
-                                        for axis in 0..self.puzzle.d as i16 {
-                                            if !axes.contains(&axis) {
-                                                axes.push(axis);
+                                        for axis in self.puzzle.axes() {
+                                            if !axes.contains(&axis.pos_side()) {
+                                                axes.push(axis.pos_side());
                                             }
                                         }
 
@@ -659,7 +679,7 @@ impl AppState {
                         .enumerate()
                         .find_map(|(s, ax)| (ax.pos.keys.select == c).then_some((s, &ax.pos)))
                     {
-                        if s as u16 >= self.puzzle.d {
+                        if !self.has_axis(Axis(s as i16)) {
                             return;
                         }
                         self.live_filter_string.push(side.name);
@@ -670,7 +690,7 @@ impl AppState {
                         .enumerate()
                         .find_map(|(s, ax)| (ax.neg.keys.select == c).then_some((s, &ax.neg)))
                     {
-                        if s as u16 >= self.puzzle.d {
+                        if !self.has_axis(Axis(s as i16)) {
                             return;
                         }
                         self.live_filter_string.push(side.name);
@@ -713,23 +733,27 @@ impl AppState {
         }
     }
 
-    fn get_axis_key(&self, c: KeyCode) -> Option<i16> {
+    fn get_axis_key(&self, c: KeyCode) -> Option<Side> {
         if self.keybind_set == KeybindSet::ThreeKeyStrict {
             return None;
         }
 
         match self.keybind_axial {
-            KeybindAxial::Axial => self.prefs.axes.iter().position(|ax| ax.axis_key == c),
+            KeybindAxial::Axial => self
+                .prefs
+                .axes
+                .iter()
+                .position(|ax| ax.axis_key == c)
+                .map(|s| Side(s as i16)),
             KeybindAxial::Side => self.prefs.axes.iter().enumerate().find_map(|(s, ax)| {
                 (ax.pos.keys.side == c)
-                    .then_some(s)
-                    .or_else(|| (ax.neg.keys.side == c).then_some(!s))
+                    .then_some(Side(s as i16))
+                    .or_else(|| (ax.neg.keys.side == c).then_some(Side(s as i16).opposite()))
             }),
         }
-        .map(|s| s as i16)
     }
 
-    fn perform_turn(&mut self, side: i16, from: i16, to: i16) -> Option<()> {
+    fn perform_turn(&mut self, side: Side, from: Side, to: Side) -> Option<()> {
         let mut layer_min;
         let mut layer_max;
         let turn = match self.current_turn.layer {
@@ -752,7 +776,7 @@ impl AppState {
                         unreachable!()
                     }
                 }
-                if side < 0 {
+                if !side.is_pos() {
                     layer_min *= -1;
                     layer_max *= -1;
                     std::mem::swap(&mut layer_min, &mut layer_max)
@@ -769,26 +793,20 @@ impl AppState {
 
         // turn clicked stickers
         {
-            let mut from = from;
-            let mut to = to;
-            let mut side = side;
-            let to_swap = (from < 0) != (to < 0);
-            if from < 0 {
-                from = !from
-            }
-            if to < 0 {
-                to = !to
-            }
-            if side < 0 {
-                side = !side
-            }
+            let to_swap = from.axis() != to.axis();
+            let mut from = from.axis();
+            let mut to = to.axis();
+            let side = side.axis();
             if to_swap {
                 std::mem::swap(&mut from, &mut to)
             }
             for clicked in &mut self.clicked {
-                if (layer_min - 1..=layer_max + 1).contains(&clicked[side as usize]) {
-                    clicked.swap(from as usize, to as usize);
-                    clicked[from as usize] *= -1
+                if (layer_min - 1..=layer_max + 1).contains(&clicked.layer_at_axis(side)) {
+                    let from_old = clicked.layer_at_axis(from);
+                    let to_old = clicked.layer_at_axis(to);
+
+                    *clicked.mut_layer_at_axis(from) = -to_old;
+                    *clicked.mut_layer_at_axis(to) = from_old;
                 }
             }
         }
@@ -818,26 +836,25 @@ impl AppState {
         }
     }
 
-    fn clicked_stickers(&self) -> HashMap<Vec<i16>, ClickedStyle> {
+    fn clicked_stickers(&self) -> HashMap<Position, ClickedStyle> {
         let mut out = HashMap::new();
         for clicked in &self.clicked {
             let body = self.puzzle.piece_body(clicked);
             out.insert(body.clone(), ClickedStyle::OnPiece);
-            for i in 0..self.puzzle.d as usize {
-                if body[i] == self.puzzle.n - 1 {
-                    let mut sticker = body.clone();
-                    sticker[i] = self.puzzle.n;
-                    out.insert(sticker, ClickedStyle::OnPiece);
-                }
-                if body[i] == -self.puzzle.n + 1 {
-                    let mut sticker = body.clone();
-                    sticker[i] = -self.puzzle.n;
-                    out.insert(sticker, ClickedStyle::OnPiece);
-                }
+            for sticker in self.puzzle.piece_body_stickers(&body) {
+                out.insert(sticker, ClickedStyle::OnPiece);
             }
             out.insert(clicked.clone(), ClickedStyle::Clicked);
         }
         out
+    }
+
+    fn has_axis(&self, axis: Axis) -> bool {
+        axis.in_dimension(self.puzzle.d)
+    }
+
+    fn has_side(&self, side: Side) -> bool {
+        side.in_dimension(self.puzzle.d)
     }
 }
 
@@ -887,8 +904,9 @@ impl Drop for StdoutManager {
 struct Args {
     /// Number of layers of the puzzle
     n: Option<i16>,
+
     /// Dimension of the puzzle
-    d: Option<u16>,
+    d: Option<i16>,
 
     /// Display in compact mode
     #[arg(short, long)]
@@ -951,8 +969,6 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let layout = state.make_layout(args.compact, args.vertical);
-    //println!("{:?}", layout.keybind_hints);
-    //return Ok(());
 
     let mut stdout = io::stdout();
     terminal::enable_raw_mode()?;
@@ -989,19 +1005,19 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                 Event::Mouse(MouseEvent {
                     kind, column, row, ..
                 }) => {
-                    let key = (column as i16, row as i16);
+                    let key = ScreenLocation::new(column as i16, row as i16);
                     let sticker = layout.points.get(&key);
                     if let Some(sticker) = sticker {
                         let mut sticker = sticker.clone();
-                        sticker.extend(state.section.iter());
+                        sticker.0.extend(state.section.iter());
                         let sticker = sticker;
 
                         match kind {
                             MouseEventKind::Down(_button) => {
                                 let original_length = state.clicked.len();
                                 state.clicked.retain(|st| {
-                                    st.iter()
-                                        .zip(sticker.iter())
+                                    st.0.iter()
+                                        .zip(sticker.0.iter())
                                         .any(|(a, b)| (a - b).abs() > 1)
                                 });
 
@@ -1028,22 +1044,22 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
 
         if just_resized {
             stdout
-                .queue(cursor::MoveTo(0, layout.height))?
+                .queue(cursor::MoveTo(0, layout.dimensions.y as u16))?
                 .queue(terminal::Clear(terminal::ClearType::All))?
                 .flush()?;
         }
         if previous_message != message {
             stdout
-                .queue(cursor::MoveTo(0, layout.height))?
+                .queue(cursor::MoveTo(0, layout.dimensions.y as u16))?
                 .queue(terminal::Clear(terminal::ClearType::CurrentLine))?
                 .queue(style::Print(message))?;
         }
 
-        if let Some((x, y)) = previous_hovered {
+        if let Some(ScreenLocation { x, y }) = previous_hovered {
             erase_brackets(&mut stdout, x, y)?;
         }
 
-        if let Some((x, y)) = state.hovered {
+        if let Some(ScreenLocation { x, y }) = state.hovered {
             draw_brackets(&mut stdout, x, y, ClickedStyle::Hovered, &state.prefs)?;
         }
 
@@ -1053,12 +1069,12 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
             .map(|s| (*s, HashSet::new()))
             .collect();
 
-        for ((x, y), pos) in &layout.points {
+        for (loc @ ScreenLocation { x, y }, pos) in &layout.points {
             // in this loop we are more efficient by not flushing the buffer.
 
             let mut pos = pos.clone();
-            pos.extend(state.section.iter());
-            if !state.puzzle.is_piece(&pos) {
+            pos.0.extend(state.section.iter());
+            if !state.puzzle.is_sticker_or_piece(&pos) {
                 stdout
                     .queue(cursor::MoveTo(*x as u16, *y as u16))?
                     .queue(style::Print(' '))?;
@@ -1077,28 +1093,23 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                 &Default::default()
             };
 
-            let in_filter = filter.matches_stickers(&state.puzzle.piece_stickers(&pos));
+            let in_filter = filter.matches_stickers(&state.puzzle.piece_sticker_colors(&pos));
 
-            if pos.iter().any(|x| x.abs() == state.puzzle.n) {
-                let side = state.puzzle.stickers[&pos];
+            if let Some(side) = state.puzzle.stickers.get(&pos) {
                 ch = if args.boxes {
                     '■'
-                } else if side >= 0 {
-                    state.prefs.axes[side as usize].pos.name
                 } else {
-                    state.prefs.axes[(!side) as usize].neg.name
+                    state.prefs.side_prefs(*side).name
                 };
                 color = if !in_filter {
                     state.prefs.global_colors.filtered
-                } else if side >= 0 {
-                    state.prefs.axes[side as usize].pos.color
                 } else {
-                    state.prefs.axes[(!side) as usize].neg.color
+                    state.prefs.side_prefs(*side).color
                 };
                 stdout
                     .queue(cursor::MoveTo(*x as u16, *y as u16))?
                     .queue(style::PrintStyledContent(ch.with(color)))?;
-            } else if !matches!(layout.keybind_hints.get(&(*x, *y)), Some(Some(_))) {
+            } else if !matches!(layout.keybind_hints.get(loc), Some(Some(_))) {
                 if state.alert % (state.prefs.alert_frames * 2) >= state.prefs.alert_frames {
                     ch = '+';
                     color = state.prefs.global_colors.alert;
@@ -1135,9 +1146,9 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
-        for ((x, y), side) in &layout.keybind_hints {
-            let mut pos = layout.points[&(*x, *y)].clone();
-            pos.extend(state.section.iter());
+        for (loc @ ScreenLocation { x, y }, side) in &layout.keybind_hints {
+            let mut pos = layout.points[loc].clone();
+            pos.0.extend(state.section.iter());
             if state.puzzle.is_sticker(&pos) {
                 continue;
             }
@@ -1150,25 +1161,19 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                     || (state.keybind_set == KeybindSet::FixedKey && state.puzzle.d == 3)
                     || state.keybind_set == KeybindSet::ThreeKeyStrict
                 {
-                    keycode_name_char(if *side >= 0 {
-                        state.prefs.axes[*side as usize].pos.keys.select
-                    } else {
-                        state.prefs.axes[(!side) as usize].neg.keys.select
-                    })
+                    keycode_name_char(state.prefs.side_prefs(*side).keys.select)
                 } else {
                     match state.keybind_axial {
                         KeybindAxial::Axial => {
-                            if *side >= 0 {
-                                keycode_name_char(state.prefs.axes[*side as usize].axis_key)
+                            if side.is_pos() {
+                                keycode_name_char(state.prefs.axis_prefs(side.axis()).axis_key)
                             } else {
                                 '·'
                             }
                         }
-                        KeybindAxial::Side => keycode_name_char(if *side >= 0 {
-                            state.prefs.axes[*side as usize].pos.keys.side
-                        } else {
-                            state.prefs.axes[(!side) as usize].neg.keys.side
-                        }),
+                        KeybindAxial::Side => {
+                            keycode_name_char(state.prefs.side_prefs(*side).keys.side)
+                        }
                     }
                 };
                 color = state.prefs.global_colors.piece;
@@ -1180,7 +1185,9 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
             //state.message = format!("{:?}", (x, y, side)).into();
         }
 
-        stdout.queue(cursor::MoveTo(0, layout.height))?.flush()?;
+        stdout
+            .queue(cursor::MoveTo(0, layout.dimensions.y as u16))?
+            .flush()?;
 
         if state.alert > 0 {
             state.alert -= 1;

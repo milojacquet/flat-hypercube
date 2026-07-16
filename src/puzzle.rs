@@ -4,13 +4,68 @@ use rand::rngs::ThreadRng;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Axis(pub i16);
+
+impl Axis {
+    pub fn pos_side(self) -> Side {
+        Side(self.0)
+    }
+
+    pub fn neg_side(self) -> Side {
+        Side(self.0).opposite()
+    }
+
+    pub fn match_sign(self, sign: i16) -> Side {
+        if sign >= 0 {
+            self.pos_side()
+        } else {
+            self.neg_side()
+        }
+    }
+
+    pub fn in_dimension(self, d: i16) -> bool {
+        self.0 < d
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Side(pub i16);
+
+impl Side {
+    pub fn opposite(self) -> Self {
+        Self(!self.0)
+    }
+
+    pub fn axis(self) -> Axis {
+        if self.is_pos() {
+            Axis(self.0)
+        } else {
+            Axis(!self.0)
+        }
+    }
+
+    pub fn is_pos(self) -> bool {
+        self.0 >= 0
+    }
+
+    pub fn in_dimension(self, d: i16) -> bool {
+        self.axis().in_dimension(d)
+    }
+
+    pub fn map(self, f: impl Fn(i16) -> i16) -> Self {
+        Self(f(self.0))
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SideTurn {
-    pub side: i16,
+    pub side: Side,
+    // inclusive
     pub layer_min: i16,
     pub layer_max: i16,
-    pub from: i16,
-    pub to: i16,
+    pub from: Side,
+    pub to: Side,
 }
 
 impl SideTurn {
@@ -25,10 +80,10 @@ impl SideTurn {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PuzzleTurn {
-    pub from: i16,
-    pub to: i16,
+    pub from: Side,
+    pub to: Side,
 }
 
 impl PuzzleTurn {
@@ -40,7 +95,7 @@ impl PuzzleTurn {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum Turn {
     Side(SideTurn),
     Puzzle(PuzzleTurn),
@@ -83,29 +138,75 @@ mod serde_map {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Puzzle {
-    pub n: i16,
-    pub d: u16,
-    // map from coordinate vector (only contains -n+1, n-1 every other, and ±n)
-    // to side (sides related by ! are opposite)
-    #[serde(with = "serde_map")]
-    pub stickers: HashMap<Vec<i16>, i16>,
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum PositionType {
+    Piece,
+    Sticker(Side),
 }
 
-pub fn ax(s: i16) -> i16 {
-    s.max(!s)
+#[derive(Debug, Serialize, Deserialize, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Position(pub Vec<i16>);
+
+impl Position {
+    pub fn layer_at_axis(&self, axis: Axis) -> i16 {
+        self.0[axis.0 as usize]
+    }
+
+    pub fn mut_layer_at_axis(&mut self, axis: Axis) -> &mut i16 {
+        &mut self.0[axis.0 as usize]
+    }
+
+    pub fn position_type(&self, n: i16) -> Option<PositionType> {
+        let mut on_sides = self.0.iter().enumerate().filter_map(|(ax, layer)| {
+            (layer.abs() == n).then(|| Axis(ax as i16).match_sign(*layer))
+        });
+        let Some(side) = on_sides.next() else {
+            return Some(PositionType::Piece);
+        };
+        match on_sides.next() {
+            Some(_) => None,
+            None => Some(PositionType::Sticker(side)),
+        }
+    }
+
+    pub fn piece_body(&self, n: i16) -> Self {
+        let mut out = self.clone();
+        out.0.iter_mut().for_each(|layer| {
+            if *layer == n {
+                *layer -= 1;
+            } else if *layer == -n {
+                *layer += 1;
+            }
+        });
+        out
+    }
+
+    pub fn axes(&self) -> impl Iterator<Item = Axis> {
+        (0..self.0.len()).map(|ax| Axis(ax as i16))
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Puzzle {
+    pub n: i16,
+    pub d: i16,
+    // map from coordinate vector (only contains -n+1, n-1 every other, and ±n) to side
+    #[serde(with = "serde_map")]
+    pub stickers: HashMap<Position, Side>,
 }
 
 impl Puzzle {
-    pub fn make_solved(n: i16, d: u16) -> Puzzle {
+    pub fn make_solved(n: i16, d: i16) -> Puzzle {
         if d == 1 {
-            // i think multi_cartesian_product returns empty iterator for the empty product
+            // I think multi_cartesian_product returns empty iterator for the empty product
 
             return Puzzle {
                 n,
                 d,
-                stickers: HashMap::from([(vec![-n], !0), (vec![n], 0)]),
+                stickers: HashMap::from([
+                    (Position(vec![-n]), Side(0).opposite()),
+                    (Position(vec![n]), Side(0).opposite()),
+                ]),
             };
         }
 
@@ -115,28 +216,28 @@ impl Puzzle {
                 .map(|_| (-n + 1..n).step_by(2))
                 .multi_cartesian_product(),
         ) {
-            let mut pos = vec![side];
-            pos.extend(&coords);
+            let mut pos = Position(vec![side]);
+            pos.0.extend(&coords);
             for f in 0..(d as i16) {
-                stickers.insert(pos.clone(), if side >= 0 { f } else { !f });
-                pos.rotate_right(1);
+                stickers.insert(pos.clone(), Axis(f).match_sign(side));
+                pos.0.rotate_right(1);
             }
         }
         Puzzle { n, d, stickers }
     }
 
+    // Checks if the puzzle is solved in any orientation
     pub fn is_solved(&self) -> bool {
         let mut side_colors = HashMap::new();
         for (pos, &color) in &self.stickers {
-            let side = pos
-                .iter()
-                .position(|x| x.abs() == self.n)
-                .expect("should be on a face");
-            let side = if pos[side] < 0 { !side } else { side };
-            let old_color = side_colors.insert(side, color);
-            match old_color {
-                Some(c) if c != color => return false,
-                _ => (),
+            let Some(PositionType::Sticker(side)) = pos.position_type(self.n) else {
+                panic!("should be on a facet")
+            };
+            let Some(old_color) = side_colors.insert(side, color) else {
+                continue;
+            };
+            if old_color != color {
+                return false;
             }
         }
         true
@@ -147,34 +248,28 @@ impl Puzzle {
             side,
             layer_min,
             layer_max,
-            mut from,
-            mut to,
+            from,
+            to,
         } = turn;
-        if side == from || side == !from || side == to || side == !to || from == to || from == !to {
+        if side.axis() == from.axis() || side.axis() == to.axis() || from.axis() == to.axis() {
             return None;
         }
 
         let layer_range = layer_min - 1..=layer_max + 1;
 
-        let to_swap = (from < 0) != (to < 0);
-        if from < 0 {
-            from = !from
-        }
-        if to < 0 {
-            to = !to
-        }
+        let to_swap = from.is_pos() != to.is_pos();
+        let mut from = from.axis();
+        let mut to = to.axis();
         if to_swap {
             std::mem::swap(&mut from, &mut to)
         }
 
         let mut new_stickers = HashMap::new();
         for pos in self.stickers.keys() {
-            if (side >= 0 && layer_range.contains(&pos[side as usize]))
-                || (side < 0 && layer_range.contains(&pos[(!side) as usize]))
-            {
+            if layer_range.contains(&pos.layer_at_axis(side.axis())) {
                 let mut from_pos = pos.clone();
-                from_pos[from as usize] = pos[to as usize];
-                from_pos[to as usize] = -pos[from as usize];
+                *from_pos.mut_layer_at_axis(from) = pos.layer_at_axis(to);
+                *from_pos.mut_layer_at_axis(to) = -pos.layer_at_axis(from);
                 new_stickers.insert(pos.clone(), self.stickers[&from_pos]);
             }
         }
@@ -184,15 +279,22 @@ impl Puzzle {
 
     fn puzzle_rotate(&mut self, turn: PuzzleTurn) -> Option<()> {
         let PuzzleTurn { from, to } = turn;
-        if from == to || from == !to {
+        if from == to {
             return None;
+        }
+
+        let to_swap = from.is_pos() != to.is_pos();
+        let mut from = from.axis();
+        let mut to = to.axis();
+        if to_swap {
+            std::mem::swap(&mut from, &mut to)
         }
 
         let mut new_stickers = HashMap::new();
         for pos in self.stickers.keys() {
             let mut from_pos = pos.clone();
-            from_pos[from as usize] = pos[to as usize];
-            from_pos[to as usize] = -pos[from as usize];
+            *from_pos.mut_layer_at_axis(from) = pos.layer_at_axis(to);
+            *from_pos.mut_layer_at_axis(to) = -pos.layer_at_axis(from);
             new_stickers.insert(pos.clone(), self.stickers[&from_pos]);
         }
         self.stickers = new_stickers;
@@ -206,50 +308,68 @@ impl Puzzle {
         }
     }
 
-    pub fn is_piece(&self, piece: &[i16]) -> bool {
-        piece.iter().filter(|x| x.abs() == self.n).count() <= 1
+    pub fn is_piece(&self, piece: &Position) -> bool {
+        matches!(piece.position_type(self.n), Some(PositionType::Piece))
     }
 
-    pub fn is_sticker(&self, piece: &[i16]) -> bool {
-        piece.iter().filter(|x| x.abs() == self.n).count() == 1
+    pub fn is_sticker(&self, piece: &Position) -> bool {
+        matches!(piece.position_type(self.n), Some(PositionType::Sticker(_)))
     }
 
-    pub fn piece_body(&self, piece: &[i16]) -> Vec<i16> {
-        if let Some(ind) = piece.iter().position(|x| x.abs() == self.n) {
-            let mut piece_body = piece.to_vec();
-            if piece[ind] == self.n {
-                piece_body[ind] -= 1;
-            } else {
-                piece_body[ind] += 1;
-            }
-            piece_body
-        } else {
-            piece.to_vec()
-        }
+    pub fn is_sticker_or_piece(&self, piece: &Position) -> bool {
+        matches!(piece.position_type(self.n), Some(_))
     }
 
-    fn piece_body_stickers(&self, piece: &[i16]) -> Vec<i16> {
+    pub fn piece_body(&self, piece: &Position) -> Position {
+        piece.piece_body(self.n)
+    }
+
+    pub fn piece_body_stickers(&self, piece: &Position) -> Vec<Position> {
         let mut colors = vec![];
-        for (ind, x) in piece.iter().enumerate() {
-            let mut piece = piece.to_vec();
-            if *x == self.n - 1 {
-                piece[ind] += 1;
-            } else if *x == -(self.n - 1) {
-                piece[ind] -= 1;
+        for axis in piece.axes() {
+            let mut sticker = piece.clone();
+            let layer = sticker.mut_layer_at_axis(axis);
+            if *layer == self.n - 1 {
+                *layer += 1;
+            } else if *layer == -(self.n - 1) {
+                *layer -= 1;
             } else {
                 continue;
             }
-            colors.push(self.stickers[&piece]);
+            colors.push(sticker.clone());
             if self.n == 1 {
                 // the piece of a 1^d has two stickers per axis
-                colors.push(!self.stickers[&piece]);
+                let layer = sticker.mut_layer_at_axis(axis);
+                *layer *= -1;
+                colors.push(sticker);
             }
         }
         colors
     }
 
-    pub fn piece_stickers(&self, piece: &[i16]) -> Vec<i16> {
-        self.piece_body_stickers(&self.piece_body(piece))
+    fn piece_body_sticker_colors(&self, piece: &Position) -> Vec<Side> {
+        let mut colors = vec![];
+        for axis in piece.axes() {
+            let mut sticker = piece.clone();
+            let layer = sticker.mut_layer_at_axis(axis);
+            if *layer == self.n - 1 {
+                *layer += 1;
+            } else if *layer == -(self.n - 1) {
+                *layer -= 1;
+            } else {
+                continue;
+            }
+            colors.push(self.stickers[&sticker]);
+            if self.n == 1 {
+                // the piece of a 1^d has two stickers per axis
+                colors.push(self.stickers[&sticker].opposite());
+            }
+        }
+        colors
+    }
+
+    pub fn piece_sticker_colors(&self, piece: &Position) -> Vec<Side> {
+        self.piece_body_sticker_colors(&self.piece_body(piece))
     }
 
     pub fn scramble(&mut self, rng: &mut ThreadRng) {
@@ -258,12 +378,16 @@ impl Puzzle {
             axes.shuffle(rng);
             let layer = self.n - 1 - 2 * rng.gen_range(0..self.n);
             self.turn(Turn::Side(SideTurn {
-                side: axes[0],
+                side: Side(axes[0]),
                 layer_min: layer,
                 layer_max: layer,
-                from: axes[1],
-                to: axes[2],
+                from: Side(axes[1]),
+                to: Side(axes[2]),
             }));
         }
+    }
+
+    pub fn axes(&self) -> impl Iterator<Item = Axis> {
+        (0..self.d).map(|ax| Axis(ax as i16))
     }
 }
