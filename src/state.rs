@@ -681,18 +681,14 @@ impl AppState {
                     }
                 }
 
-                if (axes_perm.len() as i16) < self.puzzle.d - 2 {
-                    if fixed.iter().any(|h| h.axis() == handle.axis()) {
-                        self.start_alert();
-                        return;
-                    }
-                    if let Some(side) = side
-                        && side.axis() == handle.axis()
-                    {
-                        self.start_alert();
-                        return;
-                    }
+                if axes_perm.iter().any(|h| *h == handle.axis()) {
+                    self.start_alert();
+                    return;
+                }
 
+                axes_perm.push(handle.axis());
+
+                if (axes_perm.len() as i16) < self.puzzle.d - 2 {
                     performed_turn = None;
                     let mut new_fixed = fixed.clone();
                     new_fixed.push(handle);
@@ -706,6 +702,7 @@ impl AppState {
                     let mut remaining = self.puzzle.axes().filter(|a| !axes_perm.contains(a));
                     let from = remaining.next().unwrap();
                     let to = remaining.next().unwrap();
+                    assert!(remaining.next().is_none());
                     for (i, ax1) in axes_perm.iter().enumerate() {
                         for ax2 in &axes_perm[..i] {
                             if ax1.0 > ax2.0 {
