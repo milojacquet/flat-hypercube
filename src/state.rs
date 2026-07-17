@@ -153,10 +153,7 @@ impl AppState {
         };
 
         if d > prefs.max_dim() {
-            return Err(format!(
-                "dimension should be less than or equal to {}",
-                prefs.max_dim()
-            ));
+            return Err("not enough dimensions provided in preferences".to_string());
         }
         if d < 1 {
             return Err("dimension should be greater than 0".into());
