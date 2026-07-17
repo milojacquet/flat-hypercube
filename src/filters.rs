@@ -1,7 +1,7 @@
 use crate::prefs::Prefs;
 use crate::puzzle::Side;
 
-pub const DIGITS: &str = "0123456789&";
+pub const DIGITS: &str = "0123456789";
 
 #[derive(Debug, Clone)]
 enum FilterSelector {
@@ -50,6 +50,8 @@ impl Filter {
             }
 
             let mut add_sides = |have_st: &str, have: bool| -> Result<(), String> {
+                let mut digit_awaiter = 0;
+                let mut digits_awaited = "".to_string();
                 for ch in have_st.chars() {
                     if ch.is_whitespace() {
                         continue;
@@ -65,11 +67,26 @@ impl Filter {
                             have,
                             selector: FilterSelector::Side(ind.neg_side()),
                         });
-                    } else if let Some(ind) = DIGITS.chars().position(|c| c == ch) {
-                        filter_sides.push(FilterSelectorBool {
-                            have,
-                            selector: FilterSelector::Type(ind),
-                        });
+                    } else if ch == '%' {
+                        digit_awaiter += 1;
+                    } else if "0123456789".contains(ch) {
+                        if digit_awaiter > 0 {
+                            digit_awaiter -= 1;
+                            digits_awaited.push(ch);
+                        } else {
+                            digits_awaited.push(ch);
+                            filter_sides.push(FilterSelectorBool {
+                                have,
+                                selector: FilterSelector::Type(
+                                    digits_awaited.parse().map_err(|_| {
+                                        format!("invalid number {}", digits_awaited)
+                                    })?,
+                                ),
+                            });
+
+                            digit_awaiter = 0;
+                            digits_awaited = "".to_string();
+                        };
                     } else {
                         return Err(format!("invalid character {ch}"));
                     }

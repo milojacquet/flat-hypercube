@@ -260,7 +260,7 @@ impl AppState {
     }
 
     pub fn allowed_live_filter_characters(&self) -> Vec<char> {
-        let mut out = vec!['+', '!'];
+        let mut out = vec!['+', '!', '%'];
         out.extend(crate::filters::DIGITS.chars());
         out.extend(
             self.prefs
