@@ -456,6 +456,10 @@ impl AppState {
                             self.flush_turn();
                         }
 
+                        if !self.has_side(*side) {
+                            return;
+                        }
+
                         match mode {
                             KeyCommandSideMode::Simple => {
                                 self.current_turn.sides = Some(TurnBuildSides {
@@ -531,6 +535,10 @@ impl AppState {
     }
 
     fn add_handle(&mut self, handle: Side, code: KeyCode) {
+        if !self.has_side(handle) {
+            return;
+        }
+
         let Some(sides) = self.current_turn.sides.as_mut() else {
             return;
         };
