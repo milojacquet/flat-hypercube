@@ -189,18 +189,27 @@ impl Position {
 
     pub fn apply_turn(&mut self, turn: Turn) {
         let Turn { block, from, to } = turn;
-        let TurnBlock {
-            side,
-            mut layer_min,
-            mut layer_max,
-        } = block.unwrap_or_else(TurnBlock::infinite);
+        let side;
+        let mut layer_min;
+        let mut layer_max;
+        match block {
+            Some(block) => {
+                side = Some(block.side.axis());
+                layer_min = block.layer_min;
+                layer_max = block.layer_max;
 
-        if !side.is_pos() {
-            layer_min *= -1;
-            layer_max *= -1;
-            std::mem::swap(&mut layer_min, &mut layer_max)
+                if !block.side.is_pos() {
+                    layer_min *= -1;
+                    layer_max *= -1;
+                    std::mem::swap(&mut layer_min, &mut layer_max)
+                }
+            }
+            None => {
+                side = None;
+                layer_min = -i16::MAX + 1;
+                layer_max = i16::MAX - 1;
+            }
         }
-        let side = side.axis();
 
         let layer_range = layer_min - 1..=layer_max + 1;
 
@@ -211,7 +220,7 @@ impl Position {
             std::mem::swap(&mut from, &mut to)
         }
 
-        if layer_range.contains(&self.layer_at_axis(side)) {
+        if side.is_none_or(|side| layer_range.contains(&self.layer_at_axis(side))) {
             let from_old = self.layer_at_axis(from);
             let to_old = self.layer_at_axis(to);
 

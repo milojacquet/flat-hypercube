@@ -33,36 +33,38 @@ const FRAME_LENGTH: Duration = Duration::from_millis(1000 / 30);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TurnLayer {
-    min: i16,
-    max: i16,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-pub struct TurnBuild {
-    pub layer: Option<TurnLayer>,
-    pub sides: Option<TurnBuildSides>,
+    pub min: i16,
+    pub max: i16,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct TurnBuildSides {
-    pub side: Option<Side>, // if none it is a whole puzzle rotation
-    pub handles: TurnBuildHandles,
-    pub strict: bool,
+pub enum TurnBuild {
+    Layer {
+        layer: Option<TurnLayer>,
+    },
+    SideSimple {
+        layer: Option<TurnLayer>,
+        side: Option<Side>,
+        strict: bool,
+    },
+    SideSimpleFrom {
+        layer: Option<TurnLayer>,
+        side: Option<Side>,
+        strict: bool,
+        from: Side,
+    },
+    SideFixed {
+        layer: Option<TurnLayer>,
+        side: Option<Side>,
+        strict: bool,
+        fixed: Vec<Side>,
+    },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum TurnBuildHandles {
-    Simple(TurnBuildHandlesSimple),
-    Fixed(TurnBuildHandlesFixed),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-pub struct TurnBuildHandlesSimple {
-    pub from: Option<Side>,
-}
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-pub struct TurnBuildHandlesFixed {
-    pub fixed: Vec<Side>,
+impl TurnBuild {
+    fn default() -> Self {
+        Self::Layer { layer: None }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -168,7 +170,7 @@ impl AppState {
             scramble: Puzzle::make_solved(n, d),
             mode: Default::default(),
             current_keys: Vec::new(),
-            current_turn: Default::default(),
+            current_turn: TurnBuild::default(),
             alert: Default::default(),
             rng: rand::thread_rng(),
             keybind_layer: 0,
@@ -237,7 +239,7 @@ impl AppState {
 
     fn flush_turn(&mut self) {
         self.current_keys = Vec::new();
-        self.current_turn = Default::default();
+        self.current_turn = TurnBuild::default();
         self.live_filter_string = Default::default();
     }
 
@@ -411,17 +413,7 @@ impl AppState {
                     Err(_err) => self.set_message("failed to save"),
                 },
                 KeyCommand::Layer(KeyCommandLayer { layer }) => {
-                    if *layer > self.puzzle.n {
-                        return;
-                    }
-
-                    if self.current_turn.sides.is_some() {
-                        self.current_keys.push(code);
-                        self.current_turn.layer = Some(TurnLayer {
-                            min: self.puzzle.n - 1 - 2 * (layer - 1),
-                            max: self.puzzle.n - 1 - 2 * (layer - 1),
-                        });
-                    }
+                    self.turn_add_layer(*layer, Some(code))
                 }
                 KeyCommand::Section(KeyCommandSection { axis, direction }) => {
                     let sign = direction.n();
@@ -446,56 +438,13 @@ impl AppState {
                         ))
                     }
                 }
-                KeyCommand::Side(KeyCommandSide { mode, strict, side }) => {
-                    if let Some(sides) = &self.current_turn.sides
-                        && sides.strict
-                    {
-                        self.add_handle(*side, code);
-                    } else {
-                        if self.current_turn.sides.is_some() {
-                            self.flush_turn();
-                        }
-
-                        if !self.has_side(*side) {
-                            return;
-                        }
-
-                        match mode {
-                            KeyCommandSideMode::Simple => {
-                                self.current_turn.sides = Some(TurnBuildSides {
-                                    side: Some(*side),
-                                    handles: TurnBuildHandles::Simple(Default::default()),
-                                    strict: *strict,
-                                })
-                            }
-                            KeyCommandSideMode::Fixed => {
-                                self.current_turn.sides = Some(TurnBuildSides {
-                                    side: Some(*side),
-                                    handles: TurnBuildHandles::Fixed(Default::default()),
-                                    strict: *strict,
-                                })
-                            }
-                        };
-                        self.current_keys.push(code);
-                    }
+                KeyCommand::Side(command_side) => self.turn_add_side(command_side, Some(code)),
+                KeyCommand::Rotate(command_rotate) => {
+                    self.turn_add_rotate(command_rotate, Some(code))
                 }
-                KeyCommand::Rotate(KeyCommandRotate { mode, strict }) => match mode {
-                    KeyCommandSideMode::Simple => {
-                        self.current_turn.sides = Some(TurnBuildSides {
-                            side: None,
-                            handles: TurnBuildHandles::Simple(Default::default()),
-                            strict: *strict,
-                        })
-                    }
-                    KeyCommandSideMode::Fixed => {
-                        self.current_turn.sides = Some(TurnBuildSides {
-                            side: None,
-                            handles: TurnBuildHandles::Fixed(Default::default()),
-                            strict: *strict,
-                        })
-                    }
-                },
-                KeyCommand::Handle(KeyCommandHandle { side }) => self.add_handle(*side, code),
+                KeyCommand::Handle(KeyCommandHandle { side }) => {
+                    self.turn_add_handle(*side, Some(code))
+                }
                 KeyCommand::Turn(KeyCommandTurn {
                     side,
                     layer_min,
@@ -507,94 +456,225 @@ impl AppState {
                     if let Some(min) = layer_min
                         && let Some(max) = layer_max
                     {
-                        self.current_turn.layer = Some(TurnLayer {
-                            min: *min,
-                            max: *max,
-                        })
+                        self.current_turn = TurnBuild::Layer {
+                            layer: Some(TurnLayer {
+                                min: *min,
+                                max: *max,
+                            }),
+                        }
                     };
-                    self.current_turn.sides = Some(TurnBuildSides {
-                        side: Some(*side),
-                        handles: TurnBuildHandles::Simple(TurnBuildHandlesSimple {
-                            from: Some(from.pos_side()),
-                        }),
-                        strict: true,
-                    });
-                    self.add_handle(to.pos_side(), code);
+                    self.turn_add_side(
+                        &KeyCommandSide {
+                            mode: KeyCommandSideMode::Simple,
+                            strict: true,
+                            side: *side,
+                        },
+                        None,
+                    );
+                    self.turn_add_handle(from.pos_side(), None);
+                    self.turn_add_handle(to.pos_side(), Some(code));
                 }
                 KeyCommand::TurnRotate(KeyCommandTurnRotate { from, to }) => {
                     self.flush_turn();
-                    self.current_keys.push(code);
-                    self.perform_turn(Turn {
-                        block: None,
-                        from: from.pos_side(),
-                        to: to.pos_side(),
-                    });
+                    self.turn_add_rotate(
+                        &KeyCommandRotate {
+                            mode: KeyCommandSideMode::Simple,
+                            strict: true,
+                        },
+                        None,
+                    );
+                    self.turn_add_handle(from.pos_side(), None);
+                    self.turn_add_handle(to.pos_side(), Some(code));
                 }
             },
         }
     }
 
-    fn add_handle(&mut self, handle: Side, code: KeyCode) {
+    fn turn_add_layer(&mut self, l: i16, code: Option<KeyCode>) {
+        if l > self.puzzle.n {
+            return;
+        }
+
+        self.current_turn = TurnBuild::Layer {
+            layer: Some(TurnLayer {
+                min: self.puzzle.n - 1 - 2 * l,
+                max: self.puzzle.n - 1 - 2 * l,
+            }),
+        };
+
+        self.current_keys = Vec::new();
+        if let Some(code) = code {
+            self.current_keys.push(code);
+        }
+    }
+
+    fn turn_add_side(&mut self, command: &KeyCommandSide, code: Option<KeyCode>) {
+        if !self.has_side(command.side) {
+            return;
+        }
+
+        self.current_turn = match &self.current_turn {
+            TurnBuild::Layer { layer } => match command.mode {
+                KeyCommandSideMode::Simple => TurnBuild::SideSimple {
+                    layer: *layer,
+                    side: Some(command.side),
+                    strict: command.strict,
+                },
+                KeyCommandSideMode::Fixed => TurnBuild::SideFixed {
+                    layer: *layer,
+                    side: Some(command.side),
+                    strict: command.strict,
+                    fixed: Vec::new(),
+                },
+            },
+            TurnBuild::SideSimple { strict, .. }
+            | TurnBuild::SideSimpleFrom { strict, .. }
+            | TurnBuild::SideFixed { strict, .. } => {
+                if *strict {
+                    return self.turn_add_handle(command.side, code);
+                } else {
+                    self.current_keys = Vec::new();
+                    match command.mode {
+                        KeyCommandSideMode::Simple => TurnBuild::SideSimple {
+                            layer: None,
+                            side: Some(command.side),
+                            strict: command.strict,
+                        },
+                        KeyCommandSideMode::Fixed => TurnBuild::SideFixed {
+                            layer: None,
+                            side: Some(command.side),
+                            strict: command.strict,
+                            fixed: Vec::new(),
+                        },
+                    }
+                }
+            }
+        };
+
+        if let Some(code) = code {
+            self.current_keys.push(code);
+        }
+    }
+
+    fn turn_add_rotate(&mut self, command: &KeyCommandRotate, code: Option<KeyCode>) {
+        self.current_turn = match &self.current_turn {
+            TurnBuild::Layer { layer } => match command.mode {
+                KeyCommandSideMode::Simple => TurnBuild::SideSimple {
+                    layer: *layer,
+                    side: None,
+                    strict: command.strict,
+                },
+                KeyCommandSideMode::Fixed => TurnBuild::SideFixed {
+                    layer: *layer,
+                    side: None,
+                    strict: command.strict,
+                    fixed: Vec::new(),
+                },
+            },
+            TurnBuild::SideSimple { .. }
+            | TurnBuild::SideSimpleFrom { .. }
+            | TurnBuild::SideFixed { .. } => match command.mode {
+                KeyCommandSideMode::Simple => TurnBuild::SideSimple {
+                    layer: None,
+                    side: None,
+                    strict: command.strict,
+                },
+                KeyCommandSideMode::Fixed => TurnBuild::SideFixed {
+                    layer: None,
+                    side: None,
+                    strict: command.strict,
+                    fixed: Vec::new(),
+                },
+            },
+        };
+
+        self.current_keys = Vec::new();
+        if let Some(code) = code {
+            self.current_keys.push(code);
+        }
+    }
+
+    fn turn_add_handle(&mut self, handle: Side, code: Option<KeyCode>) {
         if !self.has_side(handle) {
             return;
         }
 
-        let Some(sides) = self.current_turn.sides.as_mut() else {
-            return;
-        };
-
-        let layer = self.current_turn.layer.unwrap_or(TurnLayer {
-            min: self.puzzle.n - 1,
-            max: self.puzzle.n - 1,
-        });
-        let block = sides.side.map(|side| TurnBlock {
-            side,
-            layer_min: layer.min,
-            layer_max: layer.max,
-        });
-
-        let turn_performed;
-        match &mut sides.handles {
-            TurnBuildHandles::Simple(TurnBuildHandlesSimple { from }) => match from {
-                None => {
-                    if let Some(side) = sides.side
-                        && side.axis() == handle.axis()
-                    {
-                        self.start_alert();
-                        return;
-                    }
-                    *from = Some(handle);
-                    turn_performed = false;
+        let performed_turn;
+        self.current_turn = match &self.current_turn {
+            TurnBuild::Layer { layer: _ } => {
+                return;
+            }
+            TurnBuild::SideSimple {
+                layer,
+                side,
+                strict,
+            } => {
+                if let Some(side) = side
+                    && side.axis() == handle.axis()
+                {
+                    self.start_alert();
+                    return;
                 }
-                Some(from) => {
-                    if from.axis() == handle.axis() {
-                        self.start_alert();
-                        return;
-                    }
-                    if let Some(side) = sides.side
-                        && (side.axis() == from.axis() || side.axis() == handle.axis())
-                    {
-                        self.start_alert();
-                        return;
-                    }
 
-                    let from_val = *from;
-                    self.perform_turn(Turn {
-                        block,
-                        from: from_val,
-                        to: handle,
-                    });
-                    turn_performed = true;
+                performed_turn = None;
+                TurnBuild::SideSimpleFrom {
+                    layer: *layer,
+                    side: *side,
+                    strict: *strict,
+                    from: handle,
                 }
-            },
-            TurnBuildHandles::Fixed(TurnBuildHandlesFixed { fixed }) => {
+            }
+            TurnBuild::SideSimpleFrom {
+                layer,
+                side,
+                strict,
+                from,
+            } => {
+                if let Some(side) = side
+                    && (side.axis() == handle.axis() || from.axis() == handle.axis())
+                {
+                    self.start_alert();
+                    return;
+                }
+
+                let new_layer = layer.unwrap_or(TurnLayer {
+                    min: self.puzzle.n - 1,
+                    max: self.puzzle.n - 1,
+                });
+                let block = side.map(|side| TurnBlock {
+                    side,
+                    layer_min: new_layer.min,
+                    layer_max: new_layer.max,
+                });
+                performed_turn = Some(Turn {
+                    block,
+                    from: *from,
+                    to: handle,
+                });
+
+                if *strict {
+                    TurnBuild::default()
+                } else {
+                    TurnBuild::SideSimple {
+                        layer: *layer,
+                        side: *side,
+                        strict: *strict,
+                    }
+                }
+            }
+            TurnBuild::SideFixed {
+                layer,
+                side,
+                strict,
+                fixed,
+            } => {
                 if self.puzzle.d <= 3 {
                     return;
                 }
 
                 let mut sign = 1;
                 let mut axes_perm = Vec::new();
-                for h in sides.side.iter().chain(fixed.iter()) {
+                for h in side.iter().chain(fixed.iter()) {
                     axes_perm.push(h.axis());
                     if !h.is_pos() {
                         sign *= -1;
@@ -606,15 +686,22 @@ impl AppState {
                         self.start_alert();
                         return;
                     }
-                    if let Some(side) = sides.side
+                    if let Some(side) = side
                         && side.axis() == handle.axis()
                     {
                         self.start_alert();
                         return;
                     }
 
-                    fixed.push(handle);
-                    turn_performed = false;
+                    performed_turn = None;
+                    let mut new_fixed = fixed.clone();
+                    new_fixed.push(handle);
+                    TurnBuild::SideFixed {
+                        layer: *layer,
+                        side: *side,
+                        strict: *strict,
+                        fixed: new_fixed,
+                    }
                 } else {
                     let mut remaining = self.puzzle.axes().filter(|a| !axes_perm.contains(a));
                     let from = remaining.next().unwrap();
@@ -626,44 +713,46 @@ impl AppState {
                             }
                         }
                     }
+
+                    let new_layer = layer.unwrap_or(TurnLayer {
+                        min: self.puzzle.n - 1,
+                        max: self.puzzle.n - 1,
+                    });
+                    let block = side.map(|side| TurnBlock {
+                        side,
+                        layer_min: new_layer.min,
+                        layer_max: new_layer.max,
+                    });
                     if sign == 1 {
-                        self.perform_turn(Turn {
+                        performed_turn = Some(Turn {
                             block,
                             from: from.pos_side(),
                             to: to.pos_side(),
                         });
                     } else {
-                        self.perform_turn(Turn {
+                        performed_turn = Some(Turn {
                             block,
                             from: to.pos_side(),
                             to: from.pos_side(),
                         });
                     }
 
-                    turn_performed = true;
+                    TurnBuild::SideFixed {
+                        layer: *layer,
+                        side: *side,
+                        strict: *strict,
+                        fixed: Vec::new(),
+                    }
                 }
             }
+        };
+
+        if let Some(performed_turn) = performed_turn {
+            self.perform_turn(performed_turn);
         }
 
-        self.current_keys.push(code);
-
-        let Some(sides) = self.current_turn.sides.as_mut() else {
-            return;
-        }; // borrow checker makes me do it again
-
-        if turn_performed {
-            if sides.strict {
-                self.current_turn = Default::default()
-            } else {
-                match &mut sides.handles {
-                    TurnBuildHandles::Simple(handles) => {
-                        handles.from = None;
-                    }
-                    TurnBuildHandles::Fixed(handles) => {
-                        handles.fixed = Vec::new();
-                    }
-                }
-            }
+        if let Some(code) = code {
+            self.current_keys.push(code);
         }
     }
 
@@ -731,15 +820,17 @@ impl AppState {
     }
 
     fn which_keybind_hints(&self) -> KeybindAxial {
-        match &self.current_turn.sides {
-            Some(sides) => {
-                if sides.strict {
+        match &self.current_turn {
+            TurnBuild::Layer { .. } => KeybindAxial::Side,
+            TurnBuild::SideSimple { strict, .. }
+            | TurnBuild::SideSimpleFrom { strict, .. }
+            | TurnBuild::SideFixed { strict, .. } => {
+                if *strict {
                     KeybindAxial::Side
                 } else {
                     KeybindAxial::Axial
                 }
             }
-            None => KeybindAxial::Side,
         }
     }
 }

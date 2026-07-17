@@ -12,7 +12,7 @@ To start with a scrambled puzzle, pass the `-s` or `--scrambled` flag when openi
 
 This program supports multiple methods of interaction. <kbd>Ctrl</kbd>+<kbd>C</kbd> quits the program. <kbd>Z</kbd> undoes the most recent move, and <kbd>Shift</kbd>+<kbd>Z</kbd> redoes it. 
 
-There are multiple systems to turn the puzzle. <kbd>\\</kbd> cycles between them. In all of them, using <kbd>1</kbd> through <kbd>9</kbd> after selecting a side selects the layer of the puzzle starting from the outermost.
+There are multiple systems to turn the puzzle. <kbd>\\</kbd> cycles between them. In all of them, using <kbd>1</kbd> through <kbd>9</kbd> before selecting a side or turn selects that layer of the puzzle starting from the outermost.
 
 Each side has several keys that can be used to access it in different contexts. The selector is usually used at the beginning of the key combination to select which side to turn. The other set of keys is used to determine which direction the side should turn. When in axis mode, these keys only refer to the positive direction on each axis, and when in side mode, there are keys for both sides. Axis mode and side mode can be toggled with <kbd>Shift</kbd>+<kbd>\\</kbd>. 
 | Side (+/-) | Selector | Axis mode | Side mode |
