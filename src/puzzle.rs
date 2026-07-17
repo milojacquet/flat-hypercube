@@ -99,10 +99,10 @@ impl Turn {
         if self.from.axis() == self.to.axis() {
             return None;
         }
-        if let Some(block) = self.block {
-            if block.side.axis() == self.from.axis() || block.side.axis() == self.to.axis() {
-                return None;
-            }
+        if let Some(block) = self.block
+            && (block.side.axis() == self.from.axis() || block.side.axis() == self.to.axis())
+        {
+            return None;
         }
         Some(())
     }
@@ -156,9 +156,12 @@ impl Position {
     }
 
     pub fn position_type(&self, n: i16) -> Option<PositionType> {
-        let mut on_sides = self.0.iter().enumerate().filter_map(|(ax, layer)| {
-            (layer.abs() == n).then(|| Axis(ax as i16).match_sign(*layer))
-        });
+        let mut on_sides = self
+            .0
+            .iter()
+            .enumerate()
+            .filter(|&(_ax, layer)| layer.abs() == n)
+            .map(|(ax, layer)| Axis(ax as i16).match_sign(*layer));
         let Some(side) = on_sides.next() else {
             return Some(PositionType::Piece);
         };
@@ -250,7 +253,7 @@ impl Puzzle {
         ) {
             let mut pos = Position(vec![side]);
             pos.0.extend(&coords);
-            for f in 0..(d as i16) {
+            for f in 0..d {
                 stickers.insert(pos.clone(), Axis(f).match_sign(side));
                 pos.0.rotate_right(1);
             }
@@ -294,7 +297,7 @@ impl Puzzle {
     }
 
     pub fn is_sticker_or_piece(&self, piece: &Position) -> bool {
-        matches!(piece.position_type(self.n), Some(_))
+        piece.position_type(self.n).is_some()
     }
 
     pub fn piece_body(&self, piece: &Position) -> Position {
@@ -351,7 +354,7 @@ impl Puzzle {
 
     pub fn scramble(&mut self, rng: &mut ThreadRng) {
         for _ in 0..5000 {
-            let mut axes: Vec<i16> = (0..self.d as i16).collect();
+            let mut axes: Vec<i16> = (0..self.d).collect();
             axes.shuffle(rng);
             let layer = self.n - 1 - 2 * rng.gen_range(0..self.n);
             self.turn(Turn {
@@ -367,6 +370,6 @@ impl Puzzle {
     }
 
     pub fn axes(&self) -> impl Iterator<Item = Axis> + use<> {
-        (0..self.d).map(|ax| Axis(ax as i16))
+        (0..self.d).map(|ax| Axis(ax))
     }
 }

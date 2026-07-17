@@ -154,8 +154,7 @@ impl AppState {
             return Err(format!(
                 "dimension should be less than or equal to {}",
                 prefs.max_dim()
-            )
-            .into());
+            ));
         }
         if d < 1 {
             return Err("dimension should be greater than 0".into());
@@ -376,7 +375,7 @@ impl AppState {
                             self.set_message("nothing to redo");
                         }
                         Some(redid) => {
-                            self.puzzle.turn(redid.clone());
+                            self.puzzle.turn(redid);
                             self.undo_history.push(redid)
                         }
                     }
@@ -540,25 +539,21 @@ impl AppState {
             min: self.puzzle.n - 1,
             max: self.puzzle.n - 1,
         });
-        let block = if let Some(side) = sides.side {
-            Some(TurnBlock {
-                side,
-                layer_min: layer.min,
-                layer_max: layer.max,
-            })
-        } else {
-            None
-        };
+        let block = sides.side.map(|side| TurnBlock {
+            side,
+            layer_min: layer.min,
+            layer_max: layer.max,
+        });
 
         let turn_performed;
         match &mut sides.handles {
             TurnBuildHandles::Simple(TurnBuildHandlesSimple { from }) => match from {
                 None => {
-                    if let Some(side) = sides.side {
-                        if side.axis() == handle.axis() {
-                            self.start_alert();
-                            return;
-                        }
+                    if let Some(side) = sides.side
+                        && side.axis() == handle.axis()
+                    {
+                        self.start_alert();
+                        return;
                     }
                     *from = Some(handle);
                     turn_performed = false;
@@ -568,11 +563,11 @@ impl AppState {
                         self.start_alert();
                         return;
                     }
-                    if let Some(side) = sides.side {
-                        if side.axis() == from.axis() || side.axis() == handle.axis() {
-                            self.start_alert();
-                            return;
-                        }
+                    if let Some(side) = sides.side
+                        && (side.axis() == from.axis() || side.axis() == handle.axis())
+                    {
+                        self.start_alert();
+                        return;
                     }
 
                     let from_val = *from;
@@ -603,11 +598,11 @@ impl AppState {
                         self.start_alert();
                         return;
                     }
-                    if let Some(side) = sides.side {
-                        if side.axis() == handle.axis() {
-                            self.start_alert();
-                            return;
-                        }
+                    if let Some(side) = sides.side
+                        && side.axis() == handle.axis()
+                    {
+                        self.start_alert();
+                        return;
                     }
 
                     fixed.push(handle);
@@ -672,7 +667,7 @@ impl AppState {
             clicked.apply_turn(turn);
         }
 
-        self.undo_history.push(turn.clone());
+        self.undo_history.push(turn);
         self.puzzle.turn(turn);
 
         if self.puzzle.is_solved() {
@@ -860,7 +855,7 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
         let filters_str = std::fs::read_to_string(path).expect("Invalid filter file");
         state.filters = filters_str
             .lines()
-            .map(|l| Filter::parse(&l, &state.prefs).unwrap())
+            .map(|l| Filter::parse(l, &state.prefs).unwrap())
             .collect();
     }
 
@@ -963,7 +958,7 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
 
         let clicked_stickers = state.clicked_stickers();
         let mut clicked_locs: HashMap<_, _> = CLICKED_STYLES
-            .into_iter()
+            .iter()
             .map(|s| (*s, HashSet::new()))
             .collect();
 

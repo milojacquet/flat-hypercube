@@ -56,12 +56,12 @@ impl Layout {
     }
 
     fn squish_right(&mut self) -> &mut Self {
-        self.dimensions.x = (self.points.keys().map(|loc| loc.x).max().unwrap_or(-1) + 1) as i16;
+        self.dimensions.x = self.points.keys().map(|loc| loc.x).max().unwrap_or(-1) + 1;
         self
     }
 
     fn squish_bottom(&mut self) -> &mut Self {
-        self.dimensions.y = (self.points.keys().map(|loc| loc.y).max().unwrap_or(-1) + 1) as i16;
+        self.dimensions.y = self.points.keys().map(|loc| loc.y).max().unwrap_or(-1) + 1;
         self
     }
 
@@ -185,7 +185,7 @@ impl Layout {
         } else {
             let make_horizontal = d % 2 == 1 && !vertical;
 
-            let lower = Self::make_layout(n, ((d as i16) - 1) as i16, compact, false);
+            let lower = Self::make_layout(n, d - 1, compact, false);
             let mut row = vec![];
 
             for i in once(-n).chain((-n + 1..n).step_by(2)).chain(once(n)) {
@@ -202,10 +202,10 @@ impl Layout {
                     let keep;
                     if i == -n + 1 {
                         keep = side.is_none();
-                        *side = Some(Side((d - 1) as i16).opposite());
+                        *side = Some(Side(d - 1).opposite());
                     } else if i == n - 1 {
                         keep = side.is_none();
-                        *side = Some(Side((d - 1) as i16));
+                        *side = Some(Side(d - 1));
                     } else {
                         keep = i == 0 || i == 1
                     };

@@ -1,7 +1,7 @@
 use crate::prefs::Prefs;
 use crate::puzzle::Side;
 
-pub const DIGITS: &'static str = "0123456789&";
+pub const DIGITS: &str = "0123456789&";
 
 #[derive(Debug, Clone)]
 enum FilterSelector {

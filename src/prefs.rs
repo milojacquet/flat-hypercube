@@ -12,7 +12,7 @@ use std::io::BufReader;
 use std::num::ParseIntError;
 use std::path::Path;
 
-pub const DEFAULT_FILE_PATH_STR: &'static str = "default_prefs.json";
+pub const DEFAULT_FILE_PATH_STR: &str = "default_prefs.json";
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Prefs {
@@ -216,7 +216,7 @@ impl<'de> Deserialize<'de> for Sign {
 }
 
 fn hex(st: &str) -> Result<Color, ParseIntError> {
-    let hex = u32::from_str_radix(&st, 16)?;
+    let hex = u32::from_str_radix(st, 16)?;
     Ok(Color::AnsiValue(rgb_to_ansi256(
         ((hex >> 16) & 0xff) as u8,
         ((hex >> 8) & 0xff) as u8,
