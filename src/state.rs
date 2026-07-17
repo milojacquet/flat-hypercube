@@ -144,14 +144,7 @@ struct AppLog {
 }
 
 impl AppState {
-    fn new(n: Option<i16>, d: Option<i16>, prefs: Prefs) -> Result<Self, String> {
-        let Some(n) = n else {
-            return Err("n must be specified".into());
-        };
-        let Some(d) = d else {
-            return Err("d must be specified".into());
-        };
-
+    fn new(n: i16, d: i16, prefs: Prefs) -> Result<Self, String> {
         if d > prefs.max_dim() {
             return Err("not enough dimensions provided in preferences".to_string());
         }
@@ -200,8 +193,8 @@ impl AppState {
     }
 
     fn from_app_log(app_log: AppLog, prefs: Prefs) -> Self {
-        let mut state = AppState::new(Some(app_log.scramble.n), Some(app_log.scramble.d), prefs)
-            .expect("valid log");
+        let mut state =
+            AppState::new(app_log.scramble.n, app_log.scramble.d, prefs).expect("valid log");
         state.scramble = app_log.scramble.clone();
         state.puzzle = app_log.scramble;
         state.undo_history = app_log.moves.clone();
@@ -930,7 +923,14 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
         let app_log = serde_json::from_reader(reader).map_err(std::io::Error::other)?;
         state = AppState::from_app_log(app_log, prefs);
     } else {
-        state = AppState::new(args.n, args.d, prefs)?;
+        let Some(n) = args.n else {
+            return Err("n must be specified".into());
+        };
+        let Some(d) = args.d else {
+            return Err("d must be specified".into());
+        };
+
+        state = AppState::new(n, d, prefs)?;
         if args.scrambled {
             if state.puzzle.d <= 2 {
                 state.set_message("could not scramble");
