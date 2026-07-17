@@ -60,55 +60,51 @@ impl Side {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct SideTurn {
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+pub struct Turn {
+    #[serde(flatten)]
+    pub block: Option<TurnBlock>,
+    pub from: Side,
+    pub to: Side,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+pub struct TurnBlock {
     pub side: Side,
     // inclusive
     pub layer_min: i16,
     pub layer_max: i16,
-    pub from: Side,
-    pub to: Side,
 }
 
-impl SideTurn {
-    pub fn inverse(&self) -> Self {
-        SideTurn {
-            from: self.to,
-            to: self.from,
-            side: self.side,
-            layer_min: self.layer_min,
-            layer_max: self.layer_max,
+impl TurnBlock {
+    pub fn infinite() -> Self {
+        Self {
+            side: Side(i16::MAX),
+            layer_min: -i16::MAX + 1,
+            layer_max: i16::MAX - 1,
         }
     }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct PuzzleTurn {
-    pub from: Side,
-    pub to: Side,
-}
-
-impl PuzzleTurn {
-    pub fn inverse(&self) -> Self {
-        PuzzleTurn {
-            from: self.to,
-            to: self.from,
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum Turn {
-    Side(SideTurn),
-    Puzzle(PuzzleTurn),
 }
 
 impl Turn {
     pub fn inverse(&self) -> Self {
-        match self {
-            Self::Side(t) => Self::Side(t.inverse()),
-            Self::Puzzle(t) => Self::Puzzle(t.inverse()),
+        Turn {
+            block: self.block,
+            from: self.to,
+            to: self.from,
         }
+    }
+
+    pub fn validate(&self) -> Option<()> {
+        if self.from.axis() == self.to.axis() {
+            return None;
+        }
+        if let Some(block) = self.block {
+            if block.side.axis() == self.from.axis() || block.side.axis() == self.to.axis() {
+                return None;
+            }
+        }
+        Some(())
     }
 }
 
@@ -187,6 +183,39 @@ impl Position {
     pub fn axes(&self) -> impl Iterator<Item = Axis> {
         (0..self.0.len()).map(|ax| Axis(ax as i16))
     }
+
+    pub fn apply_turn(&mut self, turn: Turn) {
+        let Turn { block, from, to } = turn;
+        let TurnBlock {
+            side,
+            mut layer_min,
+            mut layer_max,
+        } = block.unwrap_or_else(TurnBlock::infinite);
+
+        if !side.is_pos() {
+            layer_min *= -1;
+            layer_max *= -1;
+            std::mem::swap(&mut layer_min, &mut layer_max)
+        }
+        let side = side.axis();
+
+        let layer_range = layer_min - 1..=layer_max + 1;
+
+        let to_swap = from.is_pos() != to.is_pos();
+        let mut from = from.axis();
+        let mut to = to.axis();
+        if to_swap {
+            std::mem::swap(&mut from, &mut to)
+        }
+
+        if layer_range.contains(&self.layer_at_axis(side)) {
+            let from_old = self.layer_at_axis(from);
+            let to_old = self.layer_at_axis(to);
+
+            *self.mut_layer_at_axis(from) = -to_old;
+            *self.mut_layer_at_axis(to) = from_old;
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -246,69 +275,14 @@ impl Puzzle {
         true
     }
 
-    fn side_turn(&mut self, turn: SideTurn) -> Option<()> {
-        let SideTurn {
-            side,
-            layer_min,
-            layer_max,
-            from,
-            to,
-        } = turn;
-        if side.axis() == from.axis() || side.axis() == to.axis() || from.axis() == to.axis() {
-            return None;
-        }
-
-        let layer_range = layer_min - 1..=layer_max + 1;
-
-        let to_swap = from.is_pos() != to.is_pos();
-        let mut from = from.axis();
-        let mut to = to.axis();
-        if to_swap {
-            std::mem::swap(&mut from, &mut to)
-        }
-
-        let mut new_stickers = HashMap::new();
-        for pos in self.stickers.keys() {
-            if layer_range.contains(&pos.layer_at_axis(side.axis())) {
-                let mut from_pos = pos.clone();
-                *from_pos.mut_layer_at_axis(from) = pos.layer_at_axis(to);
-                *from_pos.mut_layer_at_axis(to) = -pos.layer_at_axis(from);
-                new_stickers.insert(pos.clone(), self.stickers[&from_pos]);
-            }
-        }
-        self.stickers.extend(new_stickers);
-        Some(())
-    }
-
-    fn puzzle_rotate(&mut self, turn: PuzzleTurn) -> Option<()> {
-        let PuzzleTurn { from, to } = turn;
-        if from == to {
-            return None;
-        }
-
-        let to_swap = from.is_pos() != to.is_pos();
-        let mut from = from.axis();
-        let mut to = to.axis();
-        if to_swap {
-            std::mem::swap(&mut from, &mut to)
-        }
-
+    pub fn turn(&mut self, turn: Turn) {
         let mut new_stickers = HashMap::new();
         for pos in self.stickers.keys() {
             let mut from_pos = pos.clone();
-            *from_pos.mut_layer_at_axis(from) = pos.layer_at_axis(to);
-            *from_pos.mut_layer_at_axis(to) = -pos.layer_at_axis(from);
+            from_pos.apply_turn(turn.inverse());
             new_stickers.insert(pos.clone(), self.stickers[&from_pos]);
         }
-        self.stickers = new_stickers;
-        Some(())
-    }
-
-    pub fn turn(&mut self, turn: Turn) -> Option<()> {
-        match turn {
-            Turn::Side(t) => self.side_turn(t),
-            Turn::Puzzle(t) => self.puzzle_rotate(t),
-        }
+        self.stickers.extend(new_stickers);
     }
 
     pub fn is_piece(&self, piece: &Position) -> bool {
@@ -380,17 +354,19 @@ impl Puzzle {
             let mut axes: Vec<i16> = (0..self.d as i16).collect();
             axes.shuffle(rng);
             let layer = self.n - 1 - 2 * rng.gen_range(0..self.n);
-            self.turn(Turn::Side(SideTurn {
-                side: Side(axes[0]),
-                layer_min: layer,
-                layer_max: layer,
+            self.turn(Turn {
+                block: Some(TurnBlock {
+                    side: Side(axes[0]),
+                    layer_min: layer,
+                    layer_max: layer,
+                }),
                 from: Side(axes[1]),
                 to: Side(axes[2]),
-            }));
+            });
         }
     }
 
-    pub fn axes(&self) -> impl Iterator<Item = Axis> {
+    pub fn axes(&self) -> impl Iterator<Item = Axis> + use<> {
         (0..self.d).map(|ax| Axis(ax as i16))
     }
 }

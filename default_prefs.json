@@ -2,265 +2,236 @@
     "axes":
     [
         {
-            "pos":
-            {
-                "name": "R",
-                "color": "ff0000",
-                "keys":
-                {
-                    "select": "f",
-                    "side": "l"
-                }
-            },
-            "neg":
-            {
-                "name": "L",
-                "color": "ff8000",
-                "keys":
-                {
-                    "select": "s",
-                    "side": "j"
-                }
-            },
-            "axis_key": "k"
+            "pos": {"name": "R", "color": "ff0000"},
+            "neg": {"name": "L", "color": "ff8000"}
         },
         {
-            "pos":
-            {
-                "name": "U",
-                "color": "ffffff",
-                "keys":
-                {
-                    "select": "e",
-                    "side": "i"
-                }
-            },
-            "neg":
-            {
-                "name": "D",
-                "color": "ffff00",
-                "keys":
-                {
-                    "select": "d",
-                    "side": "k"
-                }
-            },
-            "axis_key": "j"
+            "pos": {"name": "U", "color": "ffffff"},
+            "neg": {"name": "D", "color": "ffff00"}
         },
         {
-            "pos":
-            {
-                "name": "F",
-                "color": "00ff00",
-                "keys":
-                {
-                    "select": "r",
-                    "side": "o"
-                }
-            },
-            "neg":
-            {
-                "name": "B",
-                "color": "0080ff",
-                "keys":
-                {
-                    "select": "w",
-                    "side": "u"
-                }
-            },
-            "axis_key": "l"
+            "pos": {"name": "F", "color": "00ff00"},
+            "neg": {"name": "B", "color": "0080ff"}
         },
         {
-            "pos":
-            {
-                "name": "O",
-                "color": "ff00ff",
-                "keys":
-                {
-                    "select": "t",
-                    "side": "p"
-                }
-            },
-            "neg":
-            {
-                "name": "I",
-                "color": "8f10ea",
-                "keys":
-                {
-                    "select": "g",
-                    "side": ";"
-                }
-            },
-            "axis_key": "i"
+            "pos": {"name": "O", "color": "ff00ff"},
+            "neg": {"name": "I", "color": "8f10ea"}
         },
         {
-            "pos":
-            {
-                "name": "A",
-                "color": "0aaa85",
-                "keys":
-                {
-                    "select": "v",
-                    "side": "."
-                }
-            },
-            "neg":
-            {
-                "name": "P",
-                "color": "7daa0a",
-                "keys":
-                {
-                    "select": "c",
-                    "side": ","
-                }
-            },
-            "axis_key": "u"
+            "pos": {"name": "A", "color": "0aaa85"},
+            "neg": {"name": "P", "color": "7daa0a"}
         },
         {
-            "pos":
-            {
-                "name": "Γ",
-                "color": "774811",
-                "keys":
-                {
-                    "select": "y",
-                    "side": "["
-                }
-            },
-            "neg":
-            {
-                "name": "Δ",
-                "color": "6d4564",
-                "keys":
-                {
-                    "select": "h",
-                    "side": "'"
-                }
-            },
-            "axis_key": "o"
+            "pos": {"name": "Γ", "color": "774811"},
+            "neg": {"name": "Δ", "color": "6d4564"}
         },
         {
-            "pos":
-            {
-                "name": "Θ",
-                "color": "f49fef",
-                "keys":
-                {
-                    "select": "n",
-                    "side": "Null"
-                }
-            },
-            "neg":
-            {
-                "name": "Λ",
-                "color": "d4a94e",
-                "keys":
-                {
-                    "select": "b",
-                    "side": "Null"
-                }
-            },
-            "axis_key": "p"
+            "pos": {"name": "Θ", "color": "f49fef"},
+            "neg": {"name": "Λ", "color": "d4a94e"}
         },
         {
-            "pos":
-            {
-                "name": "Ξ",
-                "color": "f9c254",
-                "keys":
-                {
-                    "select": "q",
-                    "side": "Null"
-                }
-            },
-            "neg":
-            {
-                "name": "Π",
-                "color": "b27967",
-                "keys":
-                {
-                    "select": "a",
-                    "side": "Null"
-                }
-            },
-            "axis_key": ";"
+            "pos": {"name": "Ξ", "color": "f9c254"},
+            "neg": {"name": "Π", "color": "b27967"}
         },
         {
-            "pos":
-            {
-                "name": "Σ",
-                "color": "9cf542",
-                "keys":
-                {
-                    "select": ",",
-                    "side": "Null"
-                }
-            },
-            "neg":
-            {
-                "name": "Φ",
-                "color": "42d4f5",
-                "keys":
-                {
-                    "select": "m",
-                    "side": "Null"
-                }
-            },
-            "axis_key": "["
+            "pos": {"name": "Σ", "color": "9cf542"},
+            "neg": {"name": "Φ", "color": "42d4f5"}
         },
         {
-            "pos":
-            {
-                "name": "Ψ",
-                "color": "078517",
-                "keys":
-                {
-                    "select": "/",
-                    "side": "Null"
-                }
-            },
-            "neg":
-            {
-                "name": "Ω",
-                "color": "2f2fbd",
-                "keys":
-                {
-                    "select": ".",
-                    "side": "Null"
-                }
-            },
-            "axis_key": "'"
+            "pos": {"name": "Ψ", "color": "078517"},
+            "neg": {"name": "Ω", "color": "2f2fbd"}
         }
     ],
-    "global_keys":
+    "keys":
     {
-        "layers":
-        [
-            "1",
-            "2",
-            "3",
-            "4",
-            "5",
-            "6",
-            "7",
-            "8",
-            "9"
-        ],
-        "rotate": "x",
-        "scramble": "=",
-        "reset": "-",
-        "keybind_mode": "\\",
-        "axis_mode": "|",
-        "undo": "z",
-        "redo": "Z",
-        "next_filter": "K",
-        "prev_filter": "J",
-        "live_filter_mode": "F",
-        "reset_mode": "Esc",
-        "save": "S",
-        "sections":
-        [
-            ["PageDown", "PageUp"]
+        "global":
+        {
+            "\\": {"type": "keybind_cycle"},
+            "|": {"type": "keybind_menu"},
+            "z": {"type": "undo"},
+            "Z": {"type": "redo"},
+            "K": {"type": "next_filter"},
+            "J": {"type": "prev_filter"},
+            "F": {"type": "live_filter_mode"},
+            "Esc": {"type": "reset_mode"},
+            "S": {"type": "save"},
+            "1": {"type": "layer", "layer": 1},
+            "2": {"type": "layer", "layer": 2},
+            "3": {"type": "layer", "layer": 3},
+            "4": {"type": "layer", "layer": 4},
+            "5": {"type": "layer", "layer": 5},
+            "6": {"type": "layer", "layer": 6},
+            "7": {"type": "layer", "layer": 7},
+            "8": {"type": "layer", "layer": 8},
+            "9": {"type": "layer", "layer": 9},
+            "PageUp": {"type": "section", "axis": 0, "direction": 1},
+            "PageDown": {"type": "section", "axis": 0, "direction": -1}
+        },
+        "layers": [
+            {
+                "name": "three-key",
+                "menu": "a",
+                "keys":
+                {
+                    "x": {"type": "rotate", "mode": "simple"},
+                    "f": {"type": "side", "mode": "simple", "side": {"axis": 0, "sign": 1}},
+                    "s": {"type": "side", "mode": "simple", "side": {"axis": 0, "sign": -1}},
+                    "e": {"type": "side", "mode": "simple", "side": {"axis": 1, "sign": 1}},
+                    "d": {"type": "side", "mode": "simple", "side": {"axis": 1, "sign": -1}},
+                    "r": {"type": "side", "mode": "simple", "side": {"axis": 2, "sign": 1}},
+                    "w": {"type": "side", "mode": "simple", "side": {"axis": 2, "sign": -1}},
+                    "t": {"type": "side", "mode": "simple", "side": {"axis": 3, "sign": 1}},
+                    "g": {"type": "side", "mode": "simple", "side": {"axis": 3, "sign": -1}},
+                    "v": {"type": "side", "mode": "simple", "side": {"axis": 4, "sign": 1}},
+                    "c": {"type": "side", "mode": "simple", "side": {"axis": 4, "sign": -1}},
+                    "y": {"type": "side", "mode": "simple", "side": {"axis": 5, "sign": 1}},
+                    "h": {"type": "side", "mode": "simple", "side": {"axis": 5, "sign": -1}},
+                    "n": {"type": "side", "mode": "simple", "side": {"axis": 6, "sign": 1}},
+                    "b": {"type": "side", "mode": "simple", "side": {"axis": 6, "sign": -1}},
+                    "q": {"type": "side", "mode": "simple", "side": {"axis": 7, "sign": 1}},
+                    "a": {"type": "side", "mode": "simple", "side": {"axis": 7, "sign": -1}},
+                    ",": {"type": "side", "mode": "simple", "side": {"axis": 8, "sign": 1}},
+                    "m": {"type": "side", "mode": "simple", "side": {"axis": 8, "sign": -1}},
+                    "/": {"type": "side", "mode": "simple", "side": {"axis": 9, "sign": 1}},
+                    ".": {"type": "side", "mode": "simple", "side": {"axis": 9, "sign": -1}},
+                    "k": {"type": "handle", "side": {"axis": 0, "sign": 1}},
+                    "j": {"type": "handle", "side": {"axis": 1, "sign": 1}},
+                    "l": {"type": "handle", "side": {"axis": 2, "sign": 1}},
+                    "i": {"type": "handle", "side": {"axis": 3, "sign": 1}},
+                    "u": {"type": "handle", "side": {"axis": 4, "sign": 1}},
+                    "o": {"type": "handle", "side": {"axis": 5, "sign": 1}},
+                    "p": {"type": "handle", "side": {"axis": 6, "sign": 1}},
+                    ";": {"type": "handle", "side": {"axis": 7, "sign": 1}},
+                    "[": {"type": "handle", "side": {"axis": 8, "sign": 1}},
+                    "'": {"type": "handle", "side": {"axis": 9, "sign": 1}}
+                }
+            },
+            {
+                "name": "three-key strict",
+                "menu": "s",
+                "keys":
+                {
+                    "x": {"type": "rotate", "mode": "simple"},
+                    "f": {"type": "side", "mode": "simple", "strict": true, "side": {"axis": 0, "sign": 1}},
+                    "s": {"type": "side", "mode": "simple", "strict": true, "side": {"axis": 0, "sign": -1}},
+                    "e": {"type": "side", "mode": "simple", "strict": true, "side": {"axis": 1, "sign": 1}},
+                    "d": {"type": "side", "mode": "simple", "strict": true, "side": {"axis": 1, "sign": -1}},
+                    "r": {"type": "side", "mode": "simple", "strict": true, "side": {"axis": 2, "sign": 1}},
+                    "w": {"type": "side", "mode": "simple", "strict": true, "side": {"axis": 2, "sign": -1}},
+                    "t": {"type": "side", "mode": "simple", "strict": true, "side": {"axis": 3, "sign": 1}},
+                    "g": {"type": "side", "mode": "simple", "strict": true, "side": {"axis": 3, "sign": -1}},
+                    "v": {"type": "side", "mode": "simple", "strict": true, "side": {"axis": 4, "sign": 1}},
+                    "c": {"type": "side", "mode": "simple", "strict": true, "side": {"axis": 4, "sign": -1}},
+                    "y": {"type": "side", "mode": "simple", "strict": true, "side": {"axis": 5, "sign": 1}},
+                    "h": {"type": "side", "mode": "simple", "strict": true, "side": {"axis": 5, "sign": -1}},
+                    "n": {"type": "side", "mode": "simple", "strict": true, "side": {"axis": 6, "sign": 1}},
+                    "b": {"type": "side", "mode": "simple", "strict": true, "side": {"axis": 6, "sign": -1}},
+                    "q": {"type": "side", "mode": "simple", "strict": true, "side": {"axis": 7, "sign": 1}},
+                    "a": {"type": "side", "mode": "simple", "strict": true, "side": {"axis": 7, "sign": -1}},
+                    ",": {"type": "side", "mode": "simple", "strict": true, "side": {"axis": 8, "sign": 1}},
+                    "m": {"type": "side", "mode": "simple", "strict": true, "side": {"axis": 8, "sign": -1}},
+                    "/": {"type": "side", "mode": "simple", "strict": true, "side": {"axis": 9, "sign": 1}},
+                    ".": {"type": "side", "mode": "simple", "strict": true, "side": {"axis": 9, "sign": -1}}
+                }
+            },
+            {
+                "name": "three-key side",
+                "menu": "d",
+                "keys":
+                {
+                    "x": {"type": "rotate", "mode": "simple"},
+                    "f": {"type": "side", "mode": "simple", "side": {"axis": 0, "sign": 1}},
+                    "s": {"type": "side", "mode": "simple", "side": {"axis": 0, "sign": -1}},
+                    "e": {"type": "side", "mode": "simple", "side": {"axis": 1, "sign": 1}},
+                    "d": {"type": "side", "mode": "simple", "side": {"axis": 1, "sign": -1}},
+                    "r": {"type": "side", "mode": "simple", "side": {"axis": 2, "sign": 1}},
+                    "w": {"type": "side", "mode": "simple", "side": {"axis": 2, "sign": -1}},
+                    "t": {"type": "side", "mode": "simple", "side": {"axis": 3, "sign": 1}},
+                    "g": {"type": "side", "mode": "simple", "side": {"axis": 3, "sign": -1}},
+                    "v": {"type": "side", "mode": "simple", "side": {"axis": 4, "sign": 1}},
+                    "c": {"type": "side", "mode": "simple", "side": {"axis": 4, "sign": -1}},
+                    "y": {"type": "side", "mode": "simple", "side": {"axis": 5, "sign": 1}},
+                    "h": {"type": "side", "mode": "simple", "side": {"axis": 5, "sign": -1}},
+                    "n": {"type": "side", "mode": "simple", "side": {"axis": 6, "sign": 1}},
+                    "b": {"type": "side", "mode": "simple", "side": {"axis": 6, "sign": -1}},
+                    "q": {"type": "side", "mode": "simple", "side": {"axis": 7, "sign": 1}},
+                    "a": {"type": "side", "mode": "simple", "side": {"axis": 7, "sign": -1}},
+                    ",": {"type": "side", "mode": "simple", "side": {"axis": 8, "sign": 1}},
+                    "m": {"type": "side", "mode": "simple", "side": {"axis": 8, "sign": -1}},
+                    "/": {"type": "side", "mode": "simple", "side": {"axis": 9, "sign": 1}},
+                    ".": {"type": "side", "mode": "simple", "side": {"axis": 9, "sign": -1}},
+                    "l": {"type": "handle", "side": {"axis": 0, "sign": 1}}, 
+                    "j": {"type": "handle", "side": {"axis": 0, "sign": -1}},
+                    "i": {"type": "handle", "side": {"axis": 1, "sign": 1}},
+                    "k": {"type": "handle", "side": {"axis": 1, "sign": -1}},
+                    "o": {"type": "handle", "side": {"axis": 2, "sign": 1}},
+                    "u": {"type": "handle", "side": {"axis": 2, "sign": -1}},
+                    "p": {"type": "handle", "side": {"axis": 3, "sign": 1}},
+                    ";": {"type": "handle", "side": {"axis": 3, "sign": -1}},
+                    ".": {"type": "handle", "side": {"axis": 4, "sign": 1}},
+                    ",": {"type": "handle", "side": {"axis": 4, "sign": -1}},
+                    "[": {"type": "handle", "side": {"axis": 5, "sign": 1}},
+                    "'": {"type": "handle", "side": {"axis": 5, "sign": -1}}
+                }
+            },
+            {
+                "name": "fixed-key",
+                "menu": "f",
+                "keys":
+                {
+                    "x": {"type": "rotate", "mode": "fixed"},
+                    "f": {"type": "side", "mode": "fixed", "side": {"axis": 0, "sign": 1}},
+                    "s": {"type": "side", "mode": "fixed", "side": {"axis": 0, "sign": -1}},
+                    "e": {"type": "side", "mode": "fixed", "side": {"axis": 1, "sign": 1}},
+                    "d": {"type": "side", "mode": "fixed", "side": {"axis": 1, "sign": -1}},
+                    "r": {"type": "side", "mode": "fixed", "side": {"axis": 2, "sign": 1}},
+                    "w": {"type": "side", "mode": "fixed", "side": {"axis": 2, "sign": -1}},
+                    "t": {"type": "side", "mode": "fixed", "side": {"axis": 3, "sign": 1}},
+                    "g": {"type": "side", "mode": "fixed", "side": {"axis": 3, "sign": -1}},
+                    "v": {"type": "side", "mode": "fixed", "side": {"axis": 4, "sign": 1}},
+                    "c": {"type": "side", "mode": "fixed", "side": {"axis": 4, "sign": -1}},
+                    "y": {"type": "side", "mode": "fixed", "side": {"axis": 5, "sign": 1}},
+                    "h": {"type": "side", "mode": "fixed", "side": {"axis": 5, "sign": -1}},
+                    "n": {"type": "side", "mode": "fixed", "side": {"axis": 6, "sign": 1}},
+                    "b": {"type": "side", "mode": "fixed", "side": {"axis": 6, "sign": -1}},
+                    "q": {"type": "side", "mode": "fixed", "side": {"axis": 7, "sign": 1}},
+                    "a": {"type": "side", "mode": "fixed", "side": {"axis": 7, "sign": -1}},
+                    ",": {"type": "side", "mode": "fixed", "side": {"axis": 8, "sign": 1}},
+                    "m": {"type": "side", "mode": "fixed", "side": {"axis": 8, "sign": -1}},
+                    "/": {"type": "side", "mode": "fixed", "side": {"axis": 9, "sign": 1}},
+                    ".": {"type": "side", "mode": "fixed", "side": {"axis": 9, "sign": -1}},
+                    "k": {"type": "handle", "side": {"axis": 0, "sign": 1}},
+                    "j": {"type": "handle", "side": {"axis": 1, "sign": 1}},
+                    "l": {"type": "handle", "side": {"axis": 2, "sign": 1}},
+                    "i": {"type": "handle", "side": {"axis": 3, "sign": 1}},
+                    "u": {"type": "handle", "side": {"axis": 4, "sign": 1}},
+                    "o": {"type": "handle", "side": {"axis": 5, "sign": 1}},
+                    "p": {"type": "handle", "side": {"axis": 6, "sign": 1}},
+                    ";": {"type": "handle", "side": {"axis": 7, "sign": 1}},
+                    "[": {"type": "handle", "side": {"axis": 8, "sign": 1}},
+                    "'": {"type": "handle", "side": {"axis": 9, "sign": 1}}
+                }
+            },
+            {
+                "name": "three-dimensional",
+                "menu": "g",
+                "keys":
+                {
+                    "x": {"type": "rotate", "mode": "fixed"},
+                    "f": {"type": "turn", "side": {"axis": 0, "sign": 1}, "from": 1, "to": 2},
+                    "s": {"type": "turn", "side": {"axis": 0, "sign": -1}, "from": 2, "to": 1},
+                    "e": {"type": "turn", "side": {"axis": 1, "sign": 1}, "from": 2, "to": 0},
+                    "d": {"type": "turn", "side": {"axis": 1, "sign": -1}, "from": 0, "to": 2},
+                    "r": {"type": "turn", "side": {"axis": 2, "sign": 1}, "from": 0, "to": 1},
+                    "w": {"type": "turn", "side": {"axis": 2, "sign": -1}, "from": 1, "to": 0},
+                    "l": {"type": "turn", "side": {"axis": 0, "sign": 1}, "from": 1, "to": 2},
+                    "j": {"type": "turn", "side": {"axis": 0, "sign": -1}, "from": 2, "to": 1},
+                    "i": {"type": "turn", "side": {"axis": 1, "sign": 1}, "from": 2, "to": 0},
+                    "k": {"type": "turn", "side": {"axis": 1, "sign": -1}, "from": 0, "to": 2},
+                    "o": {"type": "turn", "side": {"axis": 2, "sign": 1}, "from": 0, "to": 1},
+                    "u": {"type": "turn", "side": {"axis": 2, "sign": -1}, "from": 1, "to": 0}
+                }
+            }
         ]
     },
     "global_colors":

@@ -6,11 +6,13 @@ The projection is recursive in the number of dimensions. A puzzle of dimension 0
 
 ### Use
 
-To start the program, download it from [releases](https://github.com/milojacquet/flat-hypercube/releases/latest) and run it with the arguments `[n] [d]` to produce an `n^d` puzzle. Use `--compact` to move the stickers closer to each other, which can help on smaller screens. Passing `--section [s]` will render the puzzle as a cross section `s` dimensions lower. <kbd>PgUp</kbd> and <kbd>PgDn</kbd> will move the section along the first additional dimension, and more can be added in the preferences file. 
+To start the program, download it from [releases](https://github.com/milojacquet/flat-hypercube/releases/latest) and run it with the arguments `[n] [d]` to produce an `n^d` puzzle. Use `--compact` to move the stickers closer to each other, which can help on smaller screens. Passing `--section [s]` will render the puzzle as a cross section `s` dimensions lower. <kbd>PgUp</kbd> and <kbd>PgDn</kbd> will move the section along the first additional dimension, and more can be added in the preferences file.
 
-This program supports multiple methods of interaction. In all modes, pressing <kbd>=</kbd> 5 times scrambles the puzzle, and pressing <kbd>-</kbd> 5 times resets the puzzle. <kbd>Ctrl</kbd>+<kbd>C</kbd> quits the program. <kbd>Z</kbd> undoes the most recent move, and <kbd>Shift</kbd>+<kbd>Z</kbd> redoes it. 
+To start with a scrambled puzzle, pass the `-s` or `--scrambled` flag when opening the program.
 
-There are multiple systems to turn the puzzle. <kbd>\\</kbd> cycles between them. In all of them, using <kbd>1</kbd> through <kbd>9</kbd> before a turn sequence selects the layer of the puzzle starting from the outermost.
+This program supports multiple methods of interaction. <kbd>Ctrl</kbd>+<kbd>C</kbd> quits the program. <kbd>Z</kbd> undoes the most recent move, and <kbd>Shift</kbd>+<kbd>Z</kbd> redoes it. 
+
+There are multiple systems to turn the puzzle. <kbd>\\</kbd> cycles between them. In all of them, using <kbd>1</kbd> through <kbd>9</kbd> after selecting a side selects the layer of the puzzle starting from the outermost.
 
 Each side has several keys that can be used to access it in different contexts. The selector is usually used at the beginning of the key combination to select which side to turn. The other set of keys is used to determine which direction the side should turn. When in axis mode, these keys only refer to the positive direction on each axis, and when in side mode, there are keys for both sides. Axis mode and side mode can be toggled with <kbd>Shift</kbd>+<kbd>\\</kbd>. 
 | Side (+/-) | Selector | Axis mode | Side mode |
@@ -34,7 +36,9 @@ This mode is most similar to Magic Cube 7D. To make a turn, first use the side s
 
 In this mode, first use the side selector, then use enough axis keys to fix the rotation to occur in a plane. Once you complete a move, you can continue to use axis keys to do additional moves on the same side. To do a whole-puzzle rotation, include <kbd>X</kbd> somewhere in the sequence before the end. Once you complete a move, you can continue to use axis keys to do additional moves on the same side.
 
-In three dimensions, just pressing a side selector key rotates that side counterclockwise. To rotate it clockwise, use the corresponding face selector key from side mode.
+#### Three-dimensional mode
+
+In this mode, in three dimensions, just pressing a side selector key rotates that side counterclockwise. To rotate it clockwise, use the corresponding face selector key from side mode.
 
 ### Saving and loading
 

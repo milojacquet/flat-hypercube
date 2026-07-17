@@ -1,24 +1,23 @@
-#![allow(dead_code)]
 use crate::puzzle::Axis;
 use crate::puzzle::Side;
 use crossterm::event::KeyCode;
 use crossterm::style::Color;
+use rgb2ansi256::rgb_to_ansi256;
+use serde::Deserialize;
 use serde::Deserializer;
 use serde::de::Error;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
 use std::num::ParseIntError;
 use std::path::Path;
-
-use rgb2ansi256::rgb_to_ansi256;
-use serde::Deserialize;
 
 pub const DEFAULT_FILE_PATH_STR: &'static str = "default_prefs.json";
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Prefs {
     pub axes: Vec<PrefAxis>,
-    pub global_keys: GlobalKeys,
+    pub keys: Keys,
     pub global_colors: GlobalColors,
     pub damage_repeat: u8,
     pub alert_frames: u8,
@@ -31,16 +30,8 @@ impl Prefs {
         Ok(serde_json::from_reader(reader)?)
     }
 
-    pub fn pos_keys(&self) -> impl Iterator<Item = KeyCode> + '_ {
-        self.axes.iter().map(|side| side.pos.keys.select)
-    }
-
     pub fn max_dim(&self) -> i16 {
         self.axes.len() as i16
-    }
-
-    pub fn max_layers(&self) -> i16 {
-        (self.global_keys.layers.len() * 2 + 1) as i16
     }
 
     pub fn axis_with(&self, f: impl Fn(&PrefAxis) -> bool) -> Option<Axis> {
@@ -65,8 +56,6 @@ impl Prefs {
 pub struct PrefAxis {
     pub pos: PrefSide,
     pub neg: PrefSide,
-    #[serde(deserialize_with = "de_keycode")]
-    pub axis_key: KeyCode,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -74,15 +63,115 @@ pub struct PrefSide {
     pub name: char,
     #[serde(deserialize_with = "de_color")]
     pub color: Color,
-    pub keys: Keys,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Keys {
+    #[serde(deserialize_with = "de_keycode_map")]
+    pub global: HashMap<KeyCode, KeyCommand>,
+    pub layers: Vec<Layer>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Layer {
+    pub name: String,
     #[serde(deserialize_with = "de_keycode")]
-    pub select: KeyCode,
-    #[serde(deserialize_with = "de_keycode")]
-    pub side: KeyCode,
+    pub menu: KeyCode,
+    #[serde(deserialize_with = "de_keycode_map")]
+    pub keys: HashMap<KeyCode, KeyCommand>,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum KeyCommand {
+    Null,
+    KeybindCycle,
+    KeybindMenu,
+    Undo,
+    Redo,
+    NextFilter,
+    PrevFilter,
+    LiveFilterMode,
+    ResetMode,
+    Save,
+    Layer(KeyCommandLayer),
+    Section(KeyCommandSection),
+    Side(KeyCommandSide),
+    Rotate(KeyCommandRotate),
+    Handle(KeyCommandHandle),
+    Turn(KeyCommandTurn),
+    TurnRotate(KeyCommandTurnRotate),
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct KeyCommandLayer {
+    pub layer: i16,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct KeyCommandSection {
+    pub axis: Axis,
+    pub direction: Sign,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct KeyCommandSide {
+    pub mode: KeyCommandSideMode,
+    #[serde(default)]
+    pub strict: bool,
+    #[serde(deserialize_with = "de_side")]
+    pub side: Side,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct KeyCommandRotate {
+    pub mode: KeyCommandSideMode,
+    #[serde(default)]
+    pub strict: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct KeyCommandHandle {
+    #[serde(deserialize_with = "de_side")]
+    pub side: Side,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct KeyCommandTurn {
+    #[serde(deserialize_with = "de_side")]
+    pub side: Side,
+    pub layer_min: Option<i16>,
+    pub layer_max: Option<i16>,
+    pub from: Axis,
+    pub to: Axis,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct KeyCommandTurnRotate {
+    pub from: Axis,
+    pub to: Axis,
+}
+
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum KeyCommandSideMode {
+    Simple,
+    Fixed,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct KeyCommandParamSide {
+    axis: Axis,
+    sign: Sign,
+}
+
+// different from default deserialization for Side
+fn de_side<'de, D>(deserializer: D) -> Result<Side, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let x = KeyCommandParamSide::deserialize(deserializer)?;
+    Ok(x.axis.match_sign(x.sign.n()))
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -97,36 +186,33 @@ pub struct GlobalColors {
     pub clicked: Color,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct GlobalKeys {
-    #[serde(deserialize_with = "de_vec_keycode")]
-    pub layers: Vec<KeyCode>,
-    #[serde(deserialize_with = "de_keycode")]
-    pub rotate: KeyCode,
-    #[serde(deserialize_with = "de_keycode")]
-    pub scramble: KeyCode,
-    #[serde(deserialize_with = "de_keycode")]
-    pub reset: KeyCode,
-    #[serde(deserialize_with = "de_keycode")]
-    pub keybind_mode: KeyCode,
-    #[serde(deserialize_with = "de_keycode")]
-    pub axis_mode: KeyCode,
-    #[serde(deserialize_with = "de_keycode")]
-    pub undo: KeyCode,
-    #[serde(deserialize_with = "de_keycode")]
-    pub redo: KeyCode,
-    #[serde(deserialize_with = "de_keycode")]
-    pub next_filter: KeyCode,
-    #[serde(deserialize_with = "de_keycode")]
-    pub prev_filter: KeyCode,
-    #[serde(deserialize_with = "de_keycode")]
-    pub live_filter_mode: KeyCode,
-    #[serde(deserialize_with = "de_keycode")]
-    pub reset_mode: KeyCode,
-    #[serde(deserialize_with = "de_keycode")]
-    pub save: KeyCode,
-    #[serde(deserialize_with = "de_vec_vec_keycode")]
-    pub sections: Vec<Vec<KeyCode>>,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Sign {
+    Pos,
+    Neg,
+}
+
+impl Sign {
+    pub fn n(self) -> i16 {
+        match self {
+            Sign::Pos => 1,
+            Sign::Neg => -1,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Sign {
+    fn deserialize<D>(deserializer: D) -> Result<Sign, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let n = i32::deserialize(deserializer)?;
+        match n {
+            1 => Ok(Self::Pos),
+            -1 => Ok(Self::Neg),
+            _ => Err(D::Error::custom("invalid sign")),
+        }
+    }
 }
 
 fn hex(st: &str) -> Result<Color, ParseIntError> {
@@ -189,6 +275,19 @@ where
 {
     let st = String::deserialize(deserializer)?;
     str_keycode(&st).ok_or(D::Error::custom("not key"))
+}
+
+fn de_keycode_map<'de, D, T: Deserialize<'de>>(
+    deserializer: D,
+) -> Result<HashMap<KeyCode, T>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let st = HashMap::<String, T>::deserialize(deserializer)?;
+    st.into_iter()
+        .map(|(k, v)| Some((str_keycode(&k)?, v)))
+        .collect::<Option<_>>()
+        .ok_or(D::Error::custom("not key"))
 }
 
 fn de_vec_keycode<'de, D>(deserializer: D) -> Result<Vec<KeyCode>, D::Error>
