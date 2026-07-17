@@ -290,43 +290,6 @@ where
         .ok_or(D::Error::custom("not key"))
 }
 
-fn de_vec_keycode<'de, D>(deserializer: D) -> Result<Vec<KeyCode>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let st = Vec::<String>::deserialize(deserializer)?;
-    st.into_iter()
-        .map(|st| str_keycode(&st))
-        .collect::<Option<Vec<_>>>()
-        .ok_or(D::Error::custom("not key"))
-}
-
-fn de_vec_vec_keycode<'de, D>(deserializer: D) -> Result<Vec<Vec<KeyCode>>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let st = Vec::<Vec<String>>::deserialize(deserializer)?;
-    st.into_iter()
-        .map(|v| {
-            v.into_iter()
-                .map(|st| str_keycode(&st))
-                .collect::<Option<Vec<_>>>()
-        })
-        .collect::<Option<Vec<_>>>()
-        .ok_or(D::Error::custom("not key"))
-}
-
-fn de_option_keycode<'de, D>(deserializer: D) -> Result<Option<KeyCode>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let st = Option::<String>::deserialize(deserializer)?;
-    match st {
-        None => Ok(None),
-        Some(st) => Ok(Some(str_keycode(&st).ok_or(D::Error::custom("not key"))?)),
-    }
-}
-
 pub fn keycode_name(c: KeyCode) -> String {
     match c {
         KeyCode::Char(ch) => ch.to_string(),

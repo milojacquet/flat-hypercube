@@ -71,61 +71,6 @@ pub enum KeybindAxial {
     Side,  // select sides, more keys
 }
 
-impl KeybindAxial {
-    fn next(&self) -> Self {
-        match self {
-            Self::Axial => Self::Side,
-            Self::Side => Self::Axial,
-        }
-    }
-
-    fn name(&self) -> String {
-        match self {
-            Self::Axial => "axis keybinds".to_string(),
-            Self::Side => "side keybinds".to_string(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum KeybindSet {
-    Simple,       // MC7D, works in d dimensions, depends on axial flag
-    SimpleStrict, // MC7D, works in d dimensions, only uses one set of keys for the facets
-    Fixed,        /* works in d dimensions, requires d-2 keypresses, depends on axial flag
-                   * has addition inversion keys in 3d
-                   *XyzKey, // HSC, 4d only */
-}
-
-impl KeybindSet {
-    fn valid(&self, n: i16) -> bool {
-        match self {
-            Self::Simple => true,
-            Self::SimpleStrict => true,
-            Self::Fixed => n >= 3,
-            //Self::XyzKey => n == 4,
-        }
-    }
-
-    fn next(&self, n: i16) -> Self {
-        let next = match self {
-            Self::Simple => Self::SimpleStrict,
-            Self::SimpleStrict => Self::Fixed,
-            Self::Fixed => Self::Simple, /*Self::XyzKey,
-                                          *Self::XyzKey => Self::Simple, */
-        };
-        if !next.valid(n) { next.next(n) } else { next }
-    }
-
-    fn name(&self) -> String {
-        match self {
-            Self::Simple => "three-key".to_string(),
-            Self::SimpleStrict => "three-key strict".to_string(),
-            Self::Fixed => "fixed-key".to_string(),
-            //Self::XyzKey => "xyz".to_string(),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub enum AppMode {
     #[default]
@@ -586,18 +531,6 @@ impl AppState {
         }
     }
 
-    fn current_turn_block(&self, side: Option<Side>) -> Option<TurnBlock> {
-        let layer = self.current_turn.layer.unwrap_or(TurnLayer {
-            min: self.puzzle.n - 1,
-            max: self.puzzle.n - 1,
-        });
-        Some(TurnBlock {
-            side: side?,
-            layer_min: layer.min,
-            layer_max: layer.max,
-        })
-    }
-
     fn add_handle(&mut self, handle: Side, code: KeyCode) {
         let Some(sides) = self.current_turn.sides.as_mut() else {
             return;
@@ -782,11 +715,11 @@ impl AppState {
         out
     }
 
-    fn has_axis(&self, axis: Axis) -> bool {
+    pub fn has_axis(&self, axis: Axis) -> bool {
         axis.in_dimension(self.puzzle.d)
     }
 
-    fn has_side(&self, side: Side) -> bool {
+    pub fn has_side(&self, side: Side) -> bool {
         side.in_dimension(self.puzzle.d)
     }
 
@@ -1149,7 +1082,6 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
                     .queue(cursor::MoveTo(*x as u16, *y as u16))?
                     .queue(style::PrintStyledContent(ch.with(color)))?;
             }
-            //state.message = format!("{:?}", (x, y, side)).into();
         }
 
         stdout
@@ -1165,7 +1097,6 @@ pub fn main_inner() -> Result<(), Box<dyn std::error::Error>> {
         if frame < FRAME_LENGTH {
             std::thread::sleep(FRAME_LENGTH - frame);
         }
-        //state.puzzle.turn(0, 2, 2, 1); // R
 
         persistent_clicked_locs = clicked_locs;
     }
