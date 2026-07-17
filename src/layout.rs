@@ -3,8 +3,20 @@ use crate::puzzle::Side;
 use std::collections::HashMap;
 use std::iter::once;
 
-const GAPS: &[i16] = &[0, 1, 0, 2, 1, 10, 4, 40, 18, 160, 72];
-const GAPS_COMPACT: &[i16] = &[0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0];
+fn gap_size(d: i16, compact: bool) -> i16 {
+    if compact {
+        d & 1
+    } else {
+        match d {
+            0 => 0,
+            1 => 1,
+            2 => 0,
+            3 => 2,
+            d if d & 1 == 0 => 4_i32.pow(((d - 4) / 2) as u32) as i16,
+            d => 10 * 4_i32.pow(((d - 5) / 2) as u32) as i16,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ScreenLocation {
@@ -170,8 +182,6 @@ impl Layout {
     }
 
     pub fn make_layout(n: i16, d: i16, compact: bool, vertical: bool) -> Layout {
-        let gaps = if compact { GAPS_COMPACT } else { GAPS };
-
         if d == 0 {
             Layout {
                 dimensions: ScreenLocation::new(1, 1),
@@ -215,10 +225,10 @@ impl Layout {
                 row.push(lower);
             }
             if make_horizontal {
-                Self::concat_horiz(row, gaps[d as usize])
+                Self::concat_horiz(row, gap_size(d, compact))
             } else {
                 row.reverse();
-                Self::concat_vert(row, gaps[d as usize])
+                Self::concat_vert(row, gap_size(d, compact))
             }
         }
     }
